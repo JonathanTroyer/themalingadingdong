@@ -1,0 +1,14 @@
+# Configuration for cargo-nextest
+# https://nexte.st/docs/configuration/
+
+[profile.default]
+# Number of retries for failing tests
+retries = 0
+# Timeout for each test
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[profile.ci]
+# More retries in CI to handle flaky tests
+retries = 2
+# Fail fast in CI
+fail-fast = true

@@ -1,0 +1,24 @@
+# Configuration for cargo-tarpaulin
+# https://github.com/xd009642/tarpaulin
+
+[default]
+# Output formats
+out = ["Html", "Lcov"]
+# Output directory for reports
+output-dir = "target/coverage"
+# Ignore test functions themselves in coverage
+ignore-tests = true
+# Use all features for complete coverage
+all-features = true
+# Verbose output
+verbose = true
+# Skip test files from coverage reporting
+exclude-files = ["tests/*"]
+
+[ci]
+# CI-specific settings
+out = ["Xml", "Lcov"]
+output-dir = "target/coverage"
+ignore-tests = true
+all-features = true
+fail-under = 50

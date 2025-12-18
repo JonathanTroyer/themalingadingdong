@@ -1,0 +1,19 @@
+[package]
+name = "themalingadingdong"
+version = "0.1.0"
+edition = "2024"
+description = "Base24 palette generator using OKLCH with APCA validation"
+license = "MIT"
+
+[dependencies]
+palette = { version = "0.7", features = ["std"] }
+tinted-builder = "0.6"
+clap = { version = "4", features = ["derive"] }
+argmin = "0.11"
+serde_yaml = "0.9"
+color-eyre = "0.6"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+approx = "0.5"
