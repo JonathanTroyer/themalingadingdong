@@ -1,5 +1,6 @@
 //! Palette validation with APCA contrast checking.
 
+use float_cmp::approx_eq;
 use palette::Srgb;
 use tinted_builder::Base16Scheme;
 
@@ -78,7 +79,11 @@ pub fn validate(scheme: &Base16Scheme) -> Vec<ValidationResult> {
                     let fg_srgb = Srgb::new(fg.rgb.0, fg.rgb.1, fg.rgb.2);
                     let bg_srgb = Srgb::new(bg.rgb.0, bg.rgb.1, bg.rgb.2);
                     let contrast = apca_contrast(fg_srgb, bg_srgb);
-                    let passes = contrast.abs() >= pair.threshold.min_lc;
+                    let abs_contrast = contrast.abs();
+                    let threshold = pair.threshold.min_lc;
+                    // Pass if contrast >= threshold (with epsilon matching display precision)
+                    let passes = abs_contrast > threshold
+                        || approx_eq!(f64, abs_contrast, threshold, epsilon = 0.5);
 
                     ValidationResult {
                         pair,

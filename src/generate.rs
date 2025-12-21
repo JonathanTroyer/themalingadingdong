@@ -7,8 +7,8 @@ use palette::Srgb;
 use tinted_builder::{Base16Scheme, Color, SchemeSystem, SchemeVariant};
 
 use crate::interpolation::{
-    generate_accents_for_contrast, generate_hues, interpolate_lightness, oklch_lightness,
-    srgb_to_f32, srgb_to_hex, srgb_to_u8,
+    build_hues_with_overrides, generate_accents_for_contrast, interpolate_lightness,
+    oklch_lightness, srgb_to_f32, srgb_to_hex, srgb_to_u8,
 };
 
 /// Result of palette generation including any warnings.
@@ -27,8 +27,9 @@ pub struct GenerateConfig {
     pub background: Srgb<u8>,
     /// Foreground color (base07)
     pub foreground: Srgb<u8>,
-    /// Starting hue for accent colors (degrees, 0-360)
-    pub accent_hue: f32,
+    /// Hue overrides for accent colors (base08-base0F).
+    /// `None` values use defaults from `DEFAULT_BASE16_HUES`.
+    pub hue_overrides: [Option<f32>; 8],
     /// Target APCA contrast for accent colors (Lc value, 30-90 typical)
     pub target_contrast: f64,
     /// Target APCA contrast for extended accent colors base10-base17 (Lc value)
@@ -48,10 +49,10 @@ impl Default for GenerateConfig {
         Self {
             background: Srgb::new(26u8, 26, 46),    // #1a1a2e
             foreground: Srgb::new(234u8, 234, 234), // #eaeaea
-            accent_hue: 25.0,
+            hue_overrides: [None; 8],               // Use DEFAULT_BASE16_HUES
             target_contrast: 75.0,
             extended_contrast: 60.0,
-            accent_chroma: 0.25,
+            accent_chroma: 0.15,
             extended_chroma: 0.20,
             name: "Generated Scheme".to_string(),
             author: None,
@@ -109,8 +110,8 @@ pub fn generate_for_variant(
     // Collect warnings from accent generation
     let mut warnings = Vec::new();
 
-    // Step 1: Generate hues for accent colors
-    let accent_hues = generate_hues(config.accent_hue, 8);
+    // Step 1: Build hues from defaults with any overrides
+    let accent_hues = build_hues_with_overrides(&config.hue_overrides);
 
     // Step 2: Solve per-hue for base accents (base08-base0F)
     let base_accent_results = generate_accents_for_contrast(

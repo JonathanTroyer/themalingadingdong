@@ -1,6 +1,8 @@
 use palette::Srgb;
 use themalingadingdong::generate::{GenerateConfig, generate, parse_hex};
-use themalingadingdong::interpolation::{generate_accent_hues, interpolate_lightness};
+use themalingadingdong::interpolation::{
+    DEFAULT_BASE16_HUES, build_hues_with_overrides, generate_accent_hues, interpolate_lightness,
+};
 
 #[test]
 fn test_interpolate_lightness_generates_correct_count() {
@@ -89,7 +91,7 @@ fn test_generate_creates_scheme() {
     let config = GenerateConfig {
         background: Srgb::new(26u8, 26, 46),
         foreground: Srgb::new(234u8, 234, 234),
-        accent_hue: 25.0,
+        hue_overrides: [None; 8], // Use default hues
         target_contrast: 75.0,
         extended_contrast: 60.0,
         accent_chroma: 0.25,
@@ -104,6 +106,25 @@ fn test_generate_creates_scheme() {
     assert_eq!(result.scheme.author, "Test Author");
     // Slug now includes variant suffix
     assert!(result.scheme.slug.starts_with("test-scheme"));
+}
+
+#[test]
+fn test_build_hues_with_overrides() {
+    // Test that overrides work correctly
+    let mut overrides = [None; 8];
+    overrides[0] = Some(340.0); // Override red to pink
+    overrides[3] = Some(120.0); // Override green
+
+    let hues = build_hues_with_overrides(&overrides);
+
+    // Overridden values should be set
+    assert_eq!(hues[0], 340.0);
+    assert_eq!(hues[3], 120.0);
+
+    // Non-overridden values should match defaults
+    assert_eq!(hues[1], DEFAULT_BASE16_HUES[1]);
+    assert_eq!(hues[2], DEFAULT_BASE16_HUES[2]);
+    assert_eq!(hues[4], DEFAULT_BASE16_HUES[4]);
 }
 
 #[test]

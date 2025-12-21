@@ -115,17 +115,18 @@ fn test_cli_high_contrast_passes_without_adjust() {
 }
 
 #[test]
-fn test_cli_custom_hue() {
+fn test_cli_hue_override() {
+    // Test overriding individual hues (e.g., make base08 pink instead of red)
     cmd()
         .args([
             "--background",
             "#1a1a2e",
             "--foreground",
             "#eaeaea",
-            "--start-hue",
-            "180", // Cyan starting hue
+            "--hue-08",
+            "340", // Pink instead of default red (0°)
             "--name",
-            "Cyan Theme",
+            "Custom Hue Theme",
         ])
         .assert()
         .success()

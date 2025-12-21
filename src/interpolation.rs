@@ -4,6 +4,57 @@ use palette::{IntoColor, Oklch, Srgb};
 
 use crate::contrast_solver::solve_lightness_for_contrast;
 
+/// Default hues for base16 accent colors (base08-base0F).
+///
+/// These values are based on analysis of popular base16 themes and follow
+/// ANSI terminal color semantics:
+/// - base08: Red
+/// - base09: Orange
+/// - base0A: Yellow
+/// - base0B: Green
+/// - base0C: Cyan
+/// - base0D: Blue
+/// - base0E: Purple
+/// - base0F: Magenta
+pub const DEFAULT_BASE16_HUES: [f32; 8] = [
+    25.0,  // base08: Red
+    55.0,  // base09: Orange
+    90.0,  // base0A: Yellow
+    145.0, // base0B: Green
+    180.0, // base0C: Cyan
+    250.0, // base0D: Blue
+    285.0, // base0E: Purple
+    335.0, // base0F: Magenta
+];
+
+/// Build the final hue array from defaults with optional overrides.
+///
+/// # Arguments
+///
+/// * `overrides` - Array of optional hue overrides. `None` values use the default.
+///
+/// # Example
+///
+/// ```
+/// use themalingadingdong::interpolation::{build_hues_with_overrides, DEFAULT_BASE16_HUES};
+///
+/// // Override just base08 (red) to be more pink
+/// let mut overrides = [None; 8];
+/// overrides[0] = Some(340.0);
+/// let hues = build_hues_with_overrides(&overrides);
+/// assert_eq!(hues[0], 340.0);  // overridden
+/// assert_eq!(hues[1], DEFAULT_BASE16_HUES[1]); // unchanged
+/// ```
+pub fn build_hues_with_overrides(overrides: &[Option<f32>; 8]) -> [f32; 8] {
+    let mut hues = DEFAULT_BASE16_HUES;
+    for (i, override_hue) in overrides.iter().enumerate() {
+        if let Some(h) = override_hue {
+            hues[i] = *h;
+        }
+    }
+    hues
+}
+
 /// Result of generating an accent color with per-hue contrast solving.
 #[derive(Debug, Clone)]
 pub struct AccentResult {

@@ -8,6 +8,7 @@ use tinted_builder::SchemeVariant;
 
 use themalingadingdong::cli::{Cli, VariantArg};
 use themalingadingdong::generate::{GenerateConfig, generate_for_variant, parse_hex};
+use themalingadingdong::tui;
 use themalingadingdong::validation::validate_with_warnings;
 
 fn main() -> Result<()> {
@@ -15,23 +16,41 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Parse input colors
-    let background = parse_hex(&cli.background)
-        .map_err(|e| eyre!("Invalid background color '{}': {}", cli.background, e))?;
+    // Launch TUI if --interactive flag is set
+    if cli.interactive {
+        return tui::run(&cli);
+    }
 
-    let foreground = parse_hex(&cli.foreground)
-        .map_err(|e| eyre!("Invalid foreground color '{}': {}", cli.foreground, e))?;
+    // Parse input colors (required in non-interactive mode)
+    let bg_str = cli
+        .background
+        .as_ref()
+        .ok_or_else(|| eyre!("Background color is required"))?;
+    let fg_str = cli
+        .foreground
+        .as_ref()
+        .ok_or_else(|| eyre!("Foreground color is required"))?;
+    let name_str = cli
+        .name
+        .as_ref()
+        .ok_or_else(|| eyre!("Scheme name is required"))?;
+
+    let background =
+        parse_hex(bg_str).map_err(|e| eyre!("Invalid background color '{}': {}", bg_str, e))?;
+
+    let foreground =
+        parse_hex(fg_str).map_err(|e| eyre!("Invalid foreground color '{}': {}", fg_str, e))?;
 
     // Create generation config
     let config = GenerateConfig {
         background,
         foreground,
-        accent_hue: cli.start_hue,
+        hue_overrides: cli.hue_overrides(),
         target_contrast: cli.target_contrast,
         extended_contrast: cli.extended_contrast,
         accent_chroma: cli.accent_chroma,
         extended_chroma: cli.extended_chroma,
-        name: cli.name.clone(),
+        name: name_str.clone(),
         author: cli.author.clone(),
     };
 
