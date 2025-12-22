@@ -10,7 +10,15 @@ use crate::cli::{Cli, VariantArg};
 use crate::generate::{GenerateConfig, generate_for_variant, parse_hex};
 use crate::validation::{ValidationResult, validate};
 
-/// Focus target for keyboard navigation.
+/// Which pane is currently active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Pane {
+    #[default]
+    Parameters,
+    Validation,
+}
+
+/// Focus target for keyboard navigation within the parameters pane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Focus {
     #[default]
@@ -106,6 +114,7 @@ pub struct TuiState {
     pub validation_results: Vec<ValidationResult>,
 
     // UI state
+    pub active_pane: Pane,
     pub focus: Focus,
     pub show_help: bool,
     pub show_export: bool,
@@ -113,6 +122,7 @@ pub struct TuiState {
     pub editing_text: bool,
     pub text_cursor: usize,
     pub message: Option<String>,
+    pub validation_scroll: u16,
 }
 
 impl TuiState {
@@ -150,6 +160,7 @@ impl TuiState {
             generation_warnings: Vec::new(),
             validation_results: Vec::new(),
 
+            active_pane: Pane::Parameters,
             focus: Focus::Background,
             show_help: false,
             show_export: false,
@@ -157,6 +168,7 @@ impl TuiState {
             editing_text: false,
             text_cursor: 0,
             message: None,
+            validation_scroll: 0,
         })
     }
 
@@ -414,5 +426,41 @@ impl TuiState {
             }
             _ => {}
         }
+    }
+
+    /// Scroll the validation pane up.
+    pub fn scroll_validation_up(&mut self, lines: u16) {
+        self.validation_scroll = self.validation_scroll.saturating_sub(lines);
+    }
+
+    /// Scroll the validation pane down.
+    pub fn scroll_validation_down(&mut self, lines: u16, max_scroll: u16) {
+        self.validation_scroll = self.validation_scroll.saturating_add(lines).min(max_scroll);
+    }
+
+    /// Calculate the total number of lines in validation content.
+    pub fn validation_content_lines(&self) -> u16 {
+        if self.current_scheme.is_none() {
+            return 1;
+        }
+
+        let failures: usize = self.validation_results.iter().filter(|r| !r.passes).count();
+
+        // Summary line + empty line + failure lines (or success message) + warnings section
+        let mut lines = 2; // summary + empty line
+
+        if failures == 0 {
+            lines += 1; // success message
+        } else {
+            lines += failures;
+        }
+
+        // Warnings section
+        if !self.generation_warnings.is_empty() {
+            lines += 2; // empty line + header
+            lines += self.generation_warnings.len().min(3);
+        }
+
+        lines as u16
     }
 }

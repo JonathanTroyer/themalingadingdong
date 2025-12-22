@@ -5,7 +5,7 @@ use crossterm_actions::{
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-use super::state::TuiState;
+use super::state::{Pane, TuiState};
 
 /// Actions that can be returned from event handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,8 +55,9 @@ impl EventHandler {
             return self.handle_tui_event(tui_event, state);
         }
 
-        // Handle character input for text fields when not in edit mode
-        if state.is_text_field()
+        // Handle character input for text fields when not in edit mode (only in Parameters pane)
+        if state.active_pane == Pane::Parameters
+            && state.is_text_field()
             && let KeyCode::Char(_) = key.code
         {
             // Enter text editing mode
@@ -78,63 +79,84 @@ impl EventHandler {
             TuiEvent::App(AppEvent::Refresh) => Some(Action::Regenerate),
 
             TuiEvent::Navigation(NavigationEvent::Down) => {
-                state.focus = state.focus.next();
-                state.editing_text = false;
+                match state.active_pane {
+                    Pane::Parameters => {
+                        state.focus = state.focus.next();
+                        state.editing_text = false;
+                    }
+                    Pane::Validation => {
+                        let content_lines = state.validation_content_lines();
+                        let max_scroll = content_lines.saturating_sub(5);
+                        state.scroll_validation_down(1, max_scroll);
+                    }
+                }
                 Some(Action::None)
             }
             TuiEvent::Navigation(NavigationEvent::Up) => {
-                state.focus = state.focus.prev();
-                state.editing_text = false;
+                match state.active_pane {
+                    Pane::Parameters => {
+                        state.focus = state.focus.prev();
+                        state.editing_text = false;
+                    }
+                    Pane::Validation => {
+                        state.scroll_validation_up(1);
+                    }
+                }
                 Some(Action::None)
             }
             TuiEvent::Navigation(NavigationEvent::Left) => {
-                if state.is_variant_field() {
-                    state.cycle_variant(false);
-                    Some(Action::Regenerate)
-                } else if !state.is_text_field() {
-                    state.adjust_value(-1.0);
-                    Some(Action::Regenerate)
-                } else {
-                    Some(Action::None)
+                if state.active_pane == Pane::Parameters {
+                    if state.is_variant_field() {
+                        state.cycle_variant(false);
+                        return Some(Action::Regenerate);
+                    } else if !state.is_text_field() {
+                        state.adjust_value(-1.0);
+                        return Some(Action::Regenerate);
+                    }
                 }
-            }
-            TuiEvent::Navigation(NavigationEvent::Right) => {
-                if state.is_variant_field() {
-                    state.cycle_variant(true);
-                    Some(Action::Regenerate)
-                } else if !state.is_text_field() {
-                    state.adjust_value(1.0);
-                    Some(Action::Regenerate)
-                } else {
-                    Some(Action::None)
-                }
-            }
-
-            TuiEvent::Selection(SelectionEvent::Next) => {
-                state.focus = state.focus.next();
-                state.editing_text = false;
                 Some(Action::None)
             }
-            TuiEvent::Selection(SelectionEvent::Prev) => {
-                state.focus = state.focus.prev();
+            TuiEvent::Navigation(NavigationEvent::Right) => {
+                if state.active_pane == Pane::Parameters {
+                    if state.is_variant_field() {
+                        state.cycle_variant(true);
+                        return Some(Action::Regenerate);
+                    } else if !state.is_text_field() {
+                        state.adjust_value(1.0);
+                        return Some(Action::Regenerate);
+                    }
+                }
+                Some(Action::None)
+            }
+
+            // Tab/Shift+Tab: switch panes
+            TuiEvent::Selection(SelectionEvent::Next | SelectionEvent::Prev) => {
+                state.active_pane = match state.active_pane {
+                    Pane::Parameters => Pane::Validation,
+                    Pane::Validation => Pane::Parameters,
+                };
                 state.editing_text = false;
                 Some(Action::None)
             }
 
             TuiEvent::Input(InputEvent::Confirm) => {
-                if state.is_text_field() {
-                    if state.editing_text {
-                        // Confirm text entry and regenerate
-                        state.editing_text = false;
-                        Some(Action::Regenerate)
+                if state.active_pane == Pane::Parameters {
+                    if state.is_text_field() {
+                        if state.editing_text {
+                            // Confirm text entry and regenerate
+                            state.editing_text = false;
+                            Some(Action::Regenerate)
+                        } else {
+                            // Enter text editing mode
+                            state.editing_text = true;
+                            state.text_cursor = state.focused_text().map(|s| s.len()).unwrap_or(0);
+                            Some(Action::None)
+                        }
                     } else {
-                        // Enter text editing mode
-                        state.editing_text = true;
-                        state.text_cursor = state.focused_text().map(|s| s.len()).unwrap_or(0);
+                        state.show_export = true;
                         Some(Action::None)
                     }
                 } else {
-                    state.show_export = true;
                     Some(Action::None)
                 }
             }
@@ -194,7 +216,7 @@ impl EventHandler {
             }
             KeyCode::Tab => {
                 state.editing_text = false;
-                state.focus = state.focus.next();
+                state.active_pane = Pane::Validation;
                 Some(Action::Regenerate)
             }
             _ => Some(Action::None),

@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::cli::VariantArg;
-use crate::tui::state::{Focus, TuiState};
+use crate::tui::state::{Focus, Pane, TuiState};
 
 /// Default hues for accent colors (degrees).
 const DEFAULT_HUES: [f32; 8] = [25.0, 55.0, 90.0, 145.0, 180.0, 250.0, 285.0, 335.0];
@@ -21,7 +21,16 @@ const HUE_NAMES: [&str; 8] = [
 
 /// Draw the parameters panel.
 pub fn draw_parameters(frame: &mut Frame, area: Rect, state: &TuiState) {
-    let block = Block::default().title(" Parameters ").borders(Borders::ALL);
+    let is_active = state.active_pane == Pane::Parameters;
+    let border_style = if is_active {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default()
+    };
+    let block = Block::default()
+        .title(" Parameters ")
+        .borders(Borders::ALL)
+        .border_style(border_style);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);

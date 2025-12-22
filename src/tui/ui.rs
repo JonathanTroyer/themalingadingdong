@@ -43,10 +43,11 @@ pub fn draw(frame: &mut Frame, state: &TuiState) {
         .constraints([Constraint::Min(0), Constraint::Length(13)])
         .split(content_layout[0]);
 
-    // Right column: parameters and validation
+    // Right column: parameters (fixed height) and validation (remaining space)
+    // Parameters: 15 rows of content + 2 borders = 17 total
     let right_column = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .constraints([Constraint::Length(17), Constraint::Min(0)])
         .split(content_layout[1]);
 
     // Draw widgets
@@ -92,7 +93,7 @@ fn draw_status_bar(frame: &mut Frame, area: Rect, state: &TuiState) {
     } else if state.show_export {
         "EXPORT | Enter: Save | Esc: Cancel"
     } else {
-        "Tab/j/k: Navigate | Left/Right: Adjust | Enter: Edit/Export | ?: Help | q: Quit"
+        "Tab: Switch pane | j/k: Navigate/Scroll | Left/Right: Adjust | ?: Help | q: Quit"
     };
 
     let message = state.message.as_deref().unwrap_or("");

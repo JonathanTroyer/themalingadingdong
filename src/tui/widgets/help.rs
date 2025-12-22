@@ -34,8 +34,9 @@ pub fn draw_help_overlay(frame: &mut Frame, _state: &TuiState) {
     frame.render_widget(block, dialog_area);
 
     let keybindings = [
-        ("Tab / Down / j", "Next field"),
-        ("Shift+Tab / Up / k", "Previous field"),
+        ("Tab", "Switch pane"),
+        ("Down / j", "Next field / Scroll down"),
+        ("Up / k", "Previous field / Scroll up"),
         ("Left / Right", "Adjust value / cycle"),
         ("Enter", "Edit text / Export"),
         ("Esc", "Cancel edit"),

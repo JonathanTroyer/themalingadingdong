@@ -5,14 +5,23 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
-use crate::tui::state::TuiState;
+use crate::tui::state::{Pane, TuiState};
 
 /// Draw the validation results panel.
 pub fn draw_validation(frame: &mut Frame, area: Rect, state: &TuiState) {
-    let block = Block::default().title(" Validation ").borders(Borders::ALL);
+    let is_active = state.active_pane == Pane::Validation;
+    let border_style = if is_active {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default()
+    };
+    let block = Block::default()
+        .title(" Validation ")
+        .borders(Borders::ALL)
+        .border_style(border_style);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -48,13 +57,11 @@ pub fn draw_validation(frame: &mut Frame, area: Rect, state: &TuiState) {
 
     lines.push(Line::from(Span::raw("")));
 
-    // Show failing pairs (or first few)
-    let max_display = inner.height.saturating_sub(3) as usize;
+    // Show all failing pairs (scrollable)
     let failures: Vec<_> = state
         .validation_results
         .iter()
         .filter(|r| !r.passes)
-        .take(max_display)
         .collect();
 
     if failures.is_empty() {
@@ -76,13 +83,6 @@ pub fn draw_validation(frame: &mut Frame, area: Rect, state: &TuiState) {
                 Style::default().fg(Color::Red),
             )));
         }
-
-        if failing > max_display {
-            lines.push(Line::from(Span::styled(
-                format!("... and {} more failures", failing - max_display),
-                Style::default().fg(Color::DarkGray),
-            )));
-        }
     }
 
     // Show generation warnings if any
@@ -92,7 +92,7 @@ pub fn draw_validation(frame: &mut Frame, area: Rect, state: &TuiState) {
             "Generation warnings:",
             Style::default().fg(Color::Yellow),
         )));
-        for warning in state.generation_warnings.iter().take(3) {
+        for warning in &state.generation_warnings {
             lines.push(Line::from(Span::styled(
                 format!("  {warning}"),
                 Style::default()
@@ -102,6 +102,19 @@ pub fn draw_validation(frame: &mut Frame, area: Rect, state: &TuiState) {
         }
     }
 
-    let paragraph = Paragraph::new(lines);
+    let content_height = lines.len() as u16;
+    let visible_height = inner.height;
+    let needs_scroll = content_height > visible_height;
+
+    let paragraph = Paragraph::new(lines).scroll((state.validation_scroll, 0));
     frame.render_widget(paragraph, inner);
+
+    // Render scrollbar if content overflows
+    if needs_scroll {
+        let max_scroll = content_height.saturating_sub(visible_height);
+        let mut scrollbar_state =
+            ScrollbarState::new(max_scroll as usize).position(state.validation_scroll as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+        frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+    }
 }
