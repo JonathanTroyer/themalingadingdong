@@ -1,9 +1,13 @@
 //! CLI argument parsing and command handling.
 
+use std::path::PathBuf;
+
 use clap::{Parser, ValueEnum};
 
+use crate::curves::{CurveConfig, CurveType, InterpolationConfig};
+
 /// Output variant selection.
-#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
 pub enum VariantArg {
     /// Auto-detect from background luminance
     #[default]
@@ -14,6 +18,37 @@ pub enum VariantArg {
     Light,
     /// Generate both variants (requires --output)
     Both,
+}
+
+/// CLI-compatible curve type enum.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum CurveTypeArg {
+    /// Linear interpolation (no easing)
+    #[default]
+    Linear,
+    /// Smooth S-curve (Hermite)
+    Smoothstep,
+    /// Smoother S-curve (Ken Perlin)
+    Smootherstep,
+    /// Ease-in (accelerating start)
+    SmoothStart,
+    /// Ease-out (decelerating end)
+    SmoothEnd,
+    /// Configurable S-curve (use with --lightness-strength)
+    Sigmoid,
+}
+
+impl From<CurveTypeArg> for CurveType {
+    fn from(arg: CurveTypeArg) -> Self {
+        match arg {
+            CurveTypeArg::Linear => CurveType::Linear,
+            CurveTypeArg::Smoothstep => CurveType::Smoothstep,
+            CurveTypeArg::Smootherstep => CurveType::Smootherstep,
+            CurveTypeArg::SmoothStart => CurveType::SmoothStart,
+            CurveTypeArg::SmoothEnd => CurveType::SmoothEnd,
+            CurveTypeArg::Sigmoid => CurveType::Sigmoid,
+        }
+    }
 }
 
 /// Base24 palette generator using OKLCH color space with APCA validation.
@@ -116,6 +151,31 @@ pub struct Cli {
     /// Launch interactive TUI for previewing and editing the palette
     #[arg(short, long)]
     pub interactive: bool,
+
+    // Curve configuration
+    /// Lightness interpolation curve type
+    #[arg(long, value_enum, default_value_t = CurveTypeArg::Linear)]
+    pub lightness_curve: CurveTypeArg,
+
+    /// Lightness curve strength (for sigmoid, 1.0-10.0)
+    #[arg(long, default_value_t = 2.0)]
+    pub lightness_strength: f32,
+
+    /// Chroma interpolation curve type
+    #[arg(long, value_enum, default_value_t = CurveTypeArg::Linear)]
+    pub chroma_curve: CurveTypeArg,
+
+    /// Hue interpolation curve type
+    #[arg(long, value_enum, default_value_t = CurveTypeArg::Linear)]
+    pub hue_curve: CurveTypeArg,
+
+    /// Load configuration from TOML file
+    #[arg(long, value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
+    /// Save current configuration to TOML file
+    #[arg(long, value_name = "FILE")]
+    pub save_config: Option<PathBuf>,
 }
 
 impl Cli {
@@ -131,5 +191,26 @@ impl Cli {
             self.hue_0e,
             self.hue_0f,
         ]
+    }
+
+    /// Build InterpolationConfig from CLI arguments.
+    pub fn interpolation_config(&self) -> InterpolationConfig {
+        InterpolationConfig {
+            lightness: CurveConfig {
+                curve_type: self.lightness_curve.into(),
+                strength: self.lightness_strength,
+                control_points: None,
+            },
+            chroma: CurveConfig {
+                curve_type: self.chroma_curve.into(),
+                strength: 2.0,
+                control_points: None,
+            },
+            hue: CurveConfig {
+                curve_type: self.hue_curve.into(),
+                strength: 2.0,
+                control_points: None,
+            },
+        }
     }
 }

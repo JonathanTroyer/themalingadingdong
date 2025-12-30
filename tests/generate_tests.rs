@@ -1,5 +1,6 @@
 use palette::Srgb;
-use themalingadingdong::generate::{GenerateConfig, generate, parse_hex};
+use themalingadingdong::curves::InterpolationConfig;
+use themalingadingdong::generate::{GenerateConfig, generate, parse_color};
 use themalingadingdong::interpolation::{
     DEFAULT_BASE16_HUES, build_hues_with_overrides, generate_accent_hues, interpolate_lightness,
 };
@@ -72,7 +73,7 @@ fn test_generate_accent_hues_different_colors() {
 
 #[test]
 fn test_parse_hex_with_hash() {
-    let color = parse_hex("#1a1a2e").unwrap();
+    let color = parse_color("#1a1a2e").unwrap();
     assert_eq!(color.red, 0x1a);
     assert_eq!(color.green, 0x1a);
     assert_eq!(color.blue, 0x2e);
@@ -80,7 +81,7 @@ fn test_parse_hex_with_hash() {
 
 #[test]
 fn test_parse_hex_without_hash() {
-    let color = parse_hex("eaeaea").unwrap();
+    let color = parse_color("#eaeaea").unwrap();
     assert_eq!(color.red, 0xea);
     assert_eq!(color.green, 0xea);
     assert_eq!(color.blue, 0xea);
@@ -98,6 +99,7 @@ fn test_generate_creates_scheme() {
         extended_chroma: 0.20,
         name: "Test Scheme".to_string(),
         author: Some("Test Author".to_string()),
+        interpolation: InterpolationConfig::default(),
     };
 
     let result = generate(&config);

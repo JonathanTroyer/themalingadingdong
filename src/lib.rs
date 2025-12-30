@@ -1,6 +1,8 @@
 pub mod apca;
 pub mod cli;
+pub mod config;
 pub mod contrast_solver;
+pub mod curves;
 pub mod generate;
 pub mod interpolation;
 pub mod tui;

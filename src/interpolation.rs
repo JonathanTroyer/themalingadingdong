@@ -1,8 +1,9 @@
-//! OKLCH lightness interpolation and color utilities.
+//! OKLCH color interpolation and utilities.
 
 use palette::{IntoColor, Oklch, Srgb};
 
 use crate::contrast_solver::solve_lightness_for_contrast;
+use crate::curves::{InterpolationConfig, evaluate_curve};
 
 /// Default hues for base16 accent colors (base08-base0F).
 ///
@@ -72,10 +73,11 @@ pub struct AccentResult {
     pub warning: Option<String>,
 }
 
-/// Interpolate between two colors by varying only lightness.
+/// Interpolate between two colors in OKLCH space.
 ///
-/// Keeps hue and chroma from the darker color (lower lightness),
-/// and generates `steps` colors with evenly spaced lightness values.
+/// Interpolates all three components (lightness, chroma, hue) using
+/// palette's Mix trait for perceptually smooth color transitions.
+/// This is a convenience wrapper around `interpolate_with_curves` using linear curves.
 ///
 /// # Arguments
 ///
@@ -96,6 +98,43 @@ pub struct AccentResult {
 /// assert_eq!(colors.len(), 8);
 /// ```
 pub fn interpolate_lightness(start: Srgb<f32>, end: Srgb<f32>, steps: usize) -> Vec<Srgb<f32>> {
+    interpolate_with_curves(start, end, steps, &InterpolationConfig::default())
+}
+
+/// Interpolate between two colors in OKLCH space with configurable curves.
+///
+/// Uses separate curve configurations for lightness, chroma, and hue components,
+/// allowing non-linear easing for each channel independently.
+///
+/// # Arguments
+///
+/// * `start` - Starting color (typically the background)
+/// * `end` - Ending color (typically the foreground)
+/// * `steps` - Number of colors to generate (inclusive of start and end)
+/// * `curves` - Interpolation configuration with curves for L, C, H
+///
+/// # Example
+///
+/// ```
+/// use palette::Srgb;
+/// use themalingadingdong::curves::{InterpolationConfig, CurveConfig, CurveType};
+/// use themalingadingdong::interpolation::interpolate_with_curves;
+///
+/// let dark = Srgb::new(0.1f32, 0.1, 0.12);
+/// let light = Srgb::new(0.9f32, 0.9, 0.88);
+///
+/// let mut curves = InterpolationConfig::default();
+/// curves.lightness.curve_type = CurveType::Smoothstep;
+///
+/// let colors = interpolate_with_curves(dark, light, 8, &curves);
+/// assert_eq!(colors.len(), 8);
+/// ```
+pub fn interpolate_with_curves(
+    start: Srgb<f32>,
+    end: Srgb<f32>,
+    steps: usize,
+    curves: &InterpolationConfig,
+) -> Vec<Srgb<f32>> {
     if steps == 0 {
         return vec![];
     }
@@ -103,34 +142,51 @@ pub fn interpolate_lightness(start: Srgb<f32>, end: Srgb<f32>, steps: usize) -> 
         return vec![start];
     }
 
-    // Convert to OKLCH
+    // Convert to OKLCH for perceptually uniform interpolation
     let start_oklch: Oklch<f32> = start.into_linear().into_color();
     let end_oklch: Oklch<f32> = end.into_linear().into_color();
 
-    // Determine which is darker (lower lightness)
-    let (darker, _lighter) = if start_oklch.l < end_oklch.l {
-        (start_oklch, end_oklch)
-    } else {
-        (end_oklch, start_oklch)
-    };
-
-    // Use hue and chroma from the darker color
-    let hue = darker.hue;
-    let chroma = darker.chroma;
-
-    // Handle the case where start is lighter than end
-    let (l_start, l_end) = (start_oklch.l, end_oklch.l);
-
     (0..steps)
         .map(|i| {
-            let t = i as f32 / (steps - 1) as f32;
-            let l = l_start + (l_end - l_start) * t;
+            let linear_t = i as f32 / (steps - 1) as f32;
 
-            let oklch = Oklch::new(l, chroma, hue);
-            let linear_srgb: palette::LinSrgb<f32> = oklch.into_color();
+            // Apply different curves to each component
+            let t_l = evaluate_curve(&curves.lightness, linear_t);
+            let t_c = evaluate_curve(&curves.chroma, linear_t);
+            let t_h = evaluate_curve(&curves.hue, linear_t);
+
+            // Interpolate each component separately
+            let l = lerp(start_oklch.l, end_oklch.l, t_l);
+            let c = lerp(start_oklch.chroma, end_oklch.chroma, t_c);
+            let h = lerp_hue(
+                start_oklch.hue.into_positive_degrees(),
+                end_oklch.hue.into_positive_degrees(),
+                t_h,
+            );
+
+            let interpolated = Oklch::new(l, c, h);
+            let linear_srgb: palette::LinSrgb<f32> = interpolated.into_color();
             Srgb::from_linear(linear_srgb)
         })
         .collect()
+}
+
+/// Linear interpolation helper.
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+/// Hue interpolation with shortest-path handling.
+fn lerp_hue(a: f32, b: f32, t: f32) -> f32 {
+    let diff = b - a;
+    let adjusted_diff = if diff > 180.0 {
+        diff - 360.0
+    } else if diff < -180.0 {
+        diff + 360.0
+    } else {
+        diff
+    };
+    (a + adjusted_diff * t).rem_euclid(360.0)
 }
 
 /// Generate accent colors by rotating hue at constant lightness and chroma.
@@ -302,4 +358,11 @@ pub fn oklch_lightness(color: Srgb<u8>) -> f32 {
     let srgb = srgb_to_f32(color);
     let oklch: Oklch<f32> = srgb.into_linear().into_color();
     oklch.l
+}
+
+/// Convert sRGB to OKLCH components (lightness, chroma, hue).
+pub fn srgb_to_oklch(color: Srgb<u8>) -> (f32, f32, f32) {
+    let srgb = srgb_to_f32(color);
+    let oklch: Oklch<f32> = srgb.into_linear().into_color();
+    (oklch.l, oklch.chroma, oklch.hue.into_positive_degrees())
 }

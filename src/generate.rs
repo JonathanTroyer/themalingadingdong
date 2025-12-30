@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use csscolorparser::Color as CssColor;
 use palette::Srgb;
 use tinted_builder::{Base16Scheme, Color, SchemeSystem, SchemeVariant};
 
+use crate::curves::InterpolationConfig;
 use crate::interpolation::{
-    build_hues_with_overrides, generate_accents_for_contrast, interpolate_lightness,
+    build_hues_with_overrides, generate_accents_for_contrast, interpolate_with_curves,
     oklch_lightness, srgb_to_f32, srgb_to_hex, srgb_to_u8,
 };
 
@@ -42,6 +44,8 @@ pub struct GenerateConfig {
     pub name: String,
     /// Author name (optional)
     pub author: Option<String>,
+    /// Interpolation curve configuration for L/C/H
+    pub interpolation: InterpolationConfig,
 }
 
 impl Default for GenerateConfig {
@@ -56,6 +60,7 @@ impl Default for GenerateConfig {
             extended_chroma: 0.20,
             name: "Generated Scheme".to_string(),
             author: None,
+            interpolation: InterpolationConfig::default(),
         }
     }
 }
@@ -104,8 +109,8 @@ pub fn generate_for_variant(
     let bg_f32 = srgb_to_f32(background);
     let fg_f32 = srgb_to_f32(foreground);
 
-    // Generate UI colors (base00-base07)
-    let ui_colors = interpolate_lightness(bg_f32, fg_f32, 8);
+    // Generate UI colors (base00-base07) with curve-based interpolation
+    let ui_colors = interpolate_with_curves(bg_f32, fg_f32, 8, &config.interpolation);
 
     // Collect warnings from accent generation
     let mut warnings = Vec::new();
@@ -195,7 +200,19 @@ pub fn generate_for_variant(
     GenerationResult { scheme, warnings }
 }
 
+/// Parse any CSS color string into Srgb<u8>.
+///
+/// Supports: hex (#RRGGBB), rgb(), oklch(), named colors, etc.
+pub fn parse_color(input: &str) -> Result<Srgb<u8>, String> {
+    let css_color: CssColor = input
+        .parse()
+        .map_err(|e| format!("Invalid color '{}': {}", input, e))?;
+    let [r, g, b, _a] = css_color.to_rgba8();
+    Ok(Srgb::new(r, g, b))
+}
+
 /// Parse a hex color string into an Srgb<u8>.
+#[deprecated(note = "Use parse_color() instead which supports more formats")]
 pub fn parse_hex(hex: &str) -> Result<Srgb<u8>, String> {
     // palette's FromStr expects 6 hex chars without #
     let hex = hex.trim_start_matches('#');

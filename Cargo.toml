@@ -7,14 +7,24 @@ license = "MIT"
 
 [dependencies]
 palette = { version = "0.7", features = ["std"] }
+csscolorparser = "0.8"
 tinted-builder = "0.6"
 clap = { version = "4", features = ["derive"] }
 argmin = "0.11"
 serde_yaml = "0.9"
 color-eyre = "0.6"
 ratatui = "0.29.0"
-crossterm-actions = { version = "0.2.1", path = "../crossterm-actions" }
+tuirealm = { version = "3.2", default-features = false, features = [
+  "crossterm",
+  "derive",
+] }
+crossterm-actions = { version = "0.3.0", path = "../crossterm-actions", features = [
+  "tui-realm",
+] }
 float-cmp = "0.10"
+enterpolation = "0.3"
+toml = "0.9"
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 assert_cmd = "2"

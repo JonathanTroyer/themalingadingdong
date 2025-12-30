@@ -7,7 +7,7 @@ use color_eyre::eyre::{Result, WrapErr, bail, eyre};
 use tinted_builder::SchemeVariant;
 
 use themalingadingdong::cli::{Cli, VariantArg};
-use themalingadingdong::generate::{GenerateConfig, generate_for_variant, parse_hex};
+use themalingadingdong::generate::{GenerateConfig, generate_for_variant, parse_color};
 use themalingadingdong::tui;
 use themalingadingdong::validation::validate_with_warnings;
 
@@ -36,10 +36,10 @@ fn main() -> Result<()> {
         .ok_or_else(|| eyre!("Scheme name is required"))?;
 
     let background =
-        parse_hex(bg_str).map_err(|e| eyre!("Invalid background color '{}': {}", bg_str, e))?;
+        parse_color(bg_str).map_err(|e| eyre!("Invalid background color '{}': {}", bg_str, e))?;
 
     let foreground =
-        parse_hex(fg_str).map_err(|e| eyre!("Invalid foreground color '{}': {}", fg_str, e))?;
+        parse_color(fg_str).map_err(|e| eyre!("Invalid foreground color '{}': {}", fg_str, e))?;
 
     // Create generation config
     let config = GenerateConfig {
@@ -52,6 +52,7 @@ fn main() -> Result<()> {
         extended_chroma: cli.extended_chroma,
         name: name_str.clone(),
         author: cli.author.clone(),
+        interpolation: cli.interpolation_config(),
     };
 
     // Determine which variants to generate

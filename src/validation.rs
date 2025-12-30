@@ -15,7 +15,7 @@ pub struct ValidationPair {
 }
 
 /// Result of validating a single color pair.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidationResult {
     pub pair: ValidationPair,
     pub contrast: f64,
