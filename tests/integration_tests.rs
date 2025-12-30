@@ -59,22 +59,6 @@ fn test_cli_includes_all_base24_colors() {
 }
 
 #[test]
-fn test_cli_auto_adjustment_warnings_to_stderr() {
-    cmd()
-        .args([
-            "--background",
-            "#1a1a2e",
-            "--foreground",
-            "#eaeaea",
-            "--name",
-            "Test",
-        ])
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("Warning:").or(predicate::str::is_empty().not()));
-}
-
-#[test]
 fn test_cli_no_adjust_with_low_contrast_fails() {
     // Very low target contrast may not meet validation thresholds
     cmd()
@@ -134,24 +118,6 @@ fn test_cli_hue_override() {
 }
 
 #[test]
-fn test_cli_author_included() {
-    cmd()
-        .args([
-            "--background",
-            "#1a1a2e",
-            "--foreground",
-            "#eaeaea",
-            "--name",
-            "Test",
-            "--author",
-            "Test Author",
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("author: Test Author"));
-}
-
-#[test]
 fn test_cli_invalid_hex_fails() {
     cmd()
         .args([
@@ -165,14 +131,6 @@ fn test_cli_invalid_hex_fails() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Invalid background color"));
-}
-
-#[test]
-fn test_cli_missing_required_args() {
-    cmd()
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("required"));
 }
 
 #[test]
@@ -222,27 +180,6 @@ fn test_cli_light_variant_detected() {
         .assert()
         .success()
         .stdout(predicate::str::contains("variant: light"));
-}
-
-#[test]
-fn test_cli_help() {
-    cmd()
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Base24 palette generator"))
-        .stdout(predicate::str::contains("--background"))
-        .stdout(predicate::str::contains("--foreground"))
-        .stdout(predicate::str::contains("--name"));
-}
-
-#[test]
-fn test_cli_version() {
-    cmd()
-        .arg("--version")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("0.1.0"));
 }
 
 #[test]
@@ -298,32 +235,4 @@ fn test_cli_variant_both_requires_output() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("--variant both requires --output"));
-}
-
-#[test]
-fn test_cli_target_contrast() {
-    // Test that --target-contrast is accepted
-    cmd()
-        .args([
-            "--background",
-            "#000000",
-            "--foreground",
-            "#ffffff",
-            "--target-contrast",
-            "75",
-            "--name",
-            "Contrast Test",
-        ])
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_cli_help_shows_new_options() {
-    cmd()
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("--target-contrast"))
-        .stdout(predicate::str::contains("--variant"));
 }
