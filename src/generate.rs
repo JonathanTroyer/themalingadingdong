@@ -9,8 +9,8 @@ use tinted_builder::{Base16Scheme, Color, SchemeSystem, SchemeVariant};
 
 use crate::curves::InterpolationConfig;
 use crate::interpolation::{
-    build_hues_with_overrides, generate_accents_for_contrast, interpolate_with_curves,
-    oklch_lightness, srgb_to_f32, srgb_to_hex, srgb_to_u8,
+    build_hues_with_overrides, generate_accents_uniform, interpolate_with_curves, oklch_lightness,
+    srgb_to_f32, srgb_to_hex, srgb_to_u8,
 };
 
 /// Result of palette generation including any warnings.
@@ -32,10 +32,14 @@ pub struct GenerateConfig {
     /// Hue overrides for accent colors (base08-base0F).
     /// `None` values use defaults from `DEFAULT_BASE16_HUES`.
     pub hue_overrides: [Option<f32>; 8],
-    /// Target APCA contrast for accent colors (Lc value, 30-90 typical)
-    pub target_contrast: f64,
-    /// Target APCA contrast for extended accent colors base10-base17 (Lc value)
-    pub extended_contrast: f64,
+    /// Minimum APCA contrast for accent colors (Lc value, 30-90 typical).
+    /// Colors achieve at least this contrast while maintaining uniform lightness.
+    pub min_contrast: f64,
+    /// Minimum APCA contrast for extended accent colors base10-base17 (Lc value)
+    pub extended_min_contrast: f64,
+    /// Maximum per-hue lightness adjustment allowed (0.0-0.1, default 0.02).
+    /// Small adjustments help difficult hues reach minimum contrast.
+    pub max_lightness_adjustment: f32,
     /// Chroma for accent colors (typically 0.1-0.2)
     pub accent_chroma: f32,
     /// Chroma for extended accent colors base10-base17
@@ -54,8 +58,9 @@ impl Default for GenerateConfig {
             background: Srgb::new(26u8, 26, 46),    // #1a1a2e
             foreground: Srgb::new(234u8, 234, 234), // #eaeaea
             hue_overrides: [None; 8],               // Use DEFAULT_BASE16_HUES
-            target_contrast: 75.0,
-            extended_contrast: 60.0,
+            min_contrast: 75.0,
+            extended_min_contrast: 60.0,
+            max_lightness_adjustment: 0.02,
             accent_chroma: 0.15,
             extended_chroma: 0.20,
             name: "Generated Scheme".to_string(),
@@ -67,7 +72,7 @@ impl Default for GenerateConfig {
 
 /// Generate a Base24 color scheme from the given configuration.
 ///
-/// Computes accent lightness per-hue using APCA contrast solving.
+/// Uses uniform lightness optimization to produce visually cohesive accent colors.
 /// Returns a `GenerationResult` containing the scheme and any warnings.
 pub fn generate(config: &GenerateConfig) -> GenerationResult {
     generate_for_variant(config, None)
@@ -118,11 +123,12 @@ pub fn generate_for_variant(
     // Step 1: Build hues from defaults with any overrides
     let accent_hues = build_hues_with_overrides(&config.hue_overrides);
 
-    // Step 2: Solve per-hue for base accents (base08-base0F)
-    let base_accent_results = generate_accents_for_contrast(
+    // Step 2: Generate base accents (base08-base0F) with uniform lightness
+    let base_accent_results = generate_accents_uniform(
         &accent_hues,
         config.accent_chroma,
-        config.target_contrast,
+        config.min_contrast,
+        config.max_lightness_adjustment,
         background,
     );
 
@@ -133,11 +139,12 @@ pub fn generate_for_variant(
         }
     }
 
-    // Step 2b: Solve per-hue for extended accents (base10-base17)
-    let extended_accent_results = generate_accents_for_contrast(
+    // Step 2b: Generate extended accents (base10-base17) with uniform lightness
+    let extended_accent_results = generate_accents_uniform(
         &accent_hues,
         config.extended_chroma,
-        config.extended_contrast,
+        config.extended_min_contrast,
+        config.max_lightness_adjustment,
         background,
     );
 

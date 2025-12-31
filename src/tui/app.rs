@@ -129,33 +129,37 @@ pub fn mount_components(
     app.mount(Id::HueCurve, Box::new(hue_curve), vec![])?;
 
     // Contrast and chroma sliders
-    let target_contrast = Slider::new(
+    let min_contrast = Slider::new(
         SliderConfig {
-            label: "Target Lc".to_string(),
+            label: "Min Lc".to_string(),
             min: 30.0,
             max: 90.0,
             step: 1.0,
             precision: 0,
             suffix: String::new(),
-            slider_type: SliderType::TargetContrast,
+            slider_type: SliderType::MinContrast,
         },
-        model.target_contrast,
+        model.min_contrast,
     );
-    app.mount(Id::TargetContrast, Box::new(target_contrast), vec![])?;
+    app.mount(Id::TargetContrast, Box::new(min_contrast), vec![])?;
 
-    let extended_contrast = Slider::new(
+    let extended_min_contrast = Slider::new(
         SliderConfig {
-            label: "Extended Lc".to_string(),
+            label: "Ext Min Lc".to_string(),
             min: 30.0,
             max: 90.0,
             step: 1.0,
             precision: 0,
             suffix: String::new(),
-            slider_type: SliderType::ExtendedContrast,
+            slider_type: SliderType::ExtendedMinContrast,
         },
-        model.extended_contrast,
+        model.extended_min_contrast,
     );
-    app.mount(Id::ExtendedContrast, Box::new(extended_contrast), vec![])?;
+    app.mount(
+        Id::ExtendedContrast,
+        Box::new(extended_min_contrast),
+        vec![],
+    )?;
 
     let accent_chroma = Slider::new(
         SliderConfig {

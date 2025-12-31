@@ -52,54 +52,118 @@ impl Validation {
     }
 
     fn content_lines(&self) -> Vec<Line<'static>> {
+        use std::collections::HashMap;
+
         let mut lines = Vec::new();
 
         if !self.has_scheme {
             return lines;
         }
 
-        let total = self.results.len();
-        let passing = self.results.iter().filter(|r| r.passes).count();
-        let failing = total - passing;
+        // Group results by foreground color, tracking contrast per background
+        struct ColorData<'a> {
+            result: &'a ValidationResult,
+            lc00: Option<f64>,
+            lc01: Option<f64>,
+            worst_lc: f64,
+            worst_passes: bool,
+        }
 
-        // Summary
-        let summary_style = if failing == 0 {
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD)
-        };
+        let mut fg_data: HashMap<&str, ColorData> = HashMap::new();
+        for result in &self.results {
+            let fg = result.pair.foreground;
+            let bg = result.pair.background;
+            let abs_contrast = result.contrast.abs();
 
+            let entry = fg_data.entry(fg).or_insert(ColorData {
+                result,
+                lc00: None,
+                lc01: None,
+                worst_lc: f64::MAX,
+                worst_passes: true,
+            });
+
+            // Track contrast per background
+            match bg {
+                "base00" => entry.lc00 = Some(abs_contrast),
+                "base01" => entry.lc01 = Some(abs_contrast),
+                _ => {}
+            }
+
+            // Track worst case (lowest contrast)
+            if abs_contrast < entry.worst_lc {
+                entry.worst_lc = abs_contrast;
+                entry.worst_passes = result.passes;
+                entry.result = result;
+            }
+        }
+
+        // UI Colors section (base06, base07) - simple format
         lines.push(Line::from(Span::styled(
-            format!("{passing}/{total} pairs pass APCA contrast"),
-            summary_style,
+            "UI Colors:".to_string(),
+            Style::default().add_modifier(Modifier::BOLD),
         )));
+
+        let ui_colors = ["base06", "base07"];
+        for fg in ui_colors {
+            if let Some(data) = fg_data.get(fg) {
+                let threshold = data.result.pair.threshold.min_lc;
+                let (icon, style) = self.status_style(data.worst_passes, data.worst_lc, threshold);
+                let lc00_str = data.lc00.map(|v| format!("{:.0}", v)).unwrap_or_default();
+                let lc01_str = data.lc01.map(|v| format!("{:.0}", v)).unwrap_or_default();
+                let text = format!(
+                    "  {}: Lc00={:>3} Lc01={:>3}{}",
+                    &fg[4..],
+                    lc00_str,
+                    lc01_str,
+                    icon
+                );
+                lines.push(Line::from(Span::styled(text, style)));
+            }
+        }
         lines.push(Line::from(Span::raw("")));
 
-        // Failures
-        let failures: Vec<_> = self.results.iter().filter(|r| !r.passes).collect();
+        // Table header for accents
+        lines.push(Line::from(Span::styled(
+            "Accents:".to_string(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            "       L     C     H   Lc00 Lc01".to_string(),
+            Style::default().add_modifier(Modifier::DIM),
+        )));
 
-        if failures.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "All color pairs meet contrast requirements".to_string(),
-                Style::default().fg(Color::Green),
-            )));
-        } else {
-            for result in &failures {
-                let line = format!(
-                    "{}/{}: Lc={:.1} (need {:.0})",
-                    result.pair.foreground,
-                    result.pair.background,
-                    result.contrast.abs(),
-                    result.pair.threshold.min_lc,
-                );
-                lines.push(Line::from(Span::styled(
-                    line,
-                    Style::default().fg(Color::Red),
-                )));
+        // Primary Accents (base08-base0F)
+        let primary_accents = [
+            "base08", "base09", "base0A", "base0B", "base0C", "base0D", "base0E", "base0F",
+        ];
+        for fg in primary_accents {
+            if let Some(data) = fg_data.get(fg) {
+                lines.push(self.format_accent_row(
+                    fg,
+                    data.result,
+                    data.lc00,
+                    data.lc01,
+                    data.worst_passes,
+                    data.worst_lc,
+                ));
+            }
+        }
+
+        // Extended Accents (base10-base17)
+        let extended_accents = [
+            "base10", "base11", "base12", "base13", "base14", "base15", "base16", "base17",
+        ];
+        for fg in extended_accents {
+            if let Some(data) = fg_data.get(fg) {
+                lines.push(self.format_accent_row(
+                    fg,
+                    data.result,
+                    data.lc00,
+                    data.lc01,
+                    data.worst_passes,
+                    data.worst_lc,
+                ));
             }
         }
 
@@ -107,7 +171,7 @@ impl Validation {
         if !self.warnings.is_empty() {
             lines.push(Line::from(Span::raw("")));
             lines.push(Line::from(Span::styled(
-                "Generation warnings:".to_string(),
+                "Warnings:".to_string(),
                 Style::default().fg(Color::Yellow),
             )));
             for warning in &self.warnings {
@@ -121,6 +185,62 @@ impl Validation {
         }
 
         lines
+    }
+
+    fn format_accent_row(
+        &self,
+        fg: &str,
+        result: &ValidationResult,
+        lc00: Option<f64>,
+        lc01: Option<f64>,
+        passes: bool,
+        worst_lc: f64,
+    ) -> Line<'static> {
+        let threshold = result.pair.threshold.min_lc;
+        let (icon, style) = self.status_style(passes, worst_lc, threshold);
+
+        let (l, c, h) = result
+            .fg_oklch
+            .map(|oklch| {
+                let hue = oklch.hue.into_positive_degrees();
+                (oklch.l, oklch.chroma, hue)
+            })
+            .unwrap_or((0.0, 0.0, 0.0));
+
+        let lc00_str = lc00
+            .map(|v| format!("{:>3.0}", v))
+            .unwrap_or_else(|| "  -".to_string());
+        let lc01_str = lc01
+            .map(|v| format!("{:>3.0}", v))
+            .unwrap_or_else(|| "  -".to_string());
+
+        let text = format!(
+            "  {}  {:.2} {:.3} {:>5.1}  {} {}{}",
+            &fg[4..],
+            l,
+            c,
+            h,
+            lc00_str,
+            lc01_str,
+            icon
+        );
+        Line::from(Span::styled(text, style))
+    }
+
+    /// Get status icon and style based on contrast value.
+    fn status_style(&self, passes: bool, contrast: f64, threshold: f64) -> (&'static str, Style) {
+        if passes {
+            if contrast >= threshold + 5.0 {
+                // Comfortably passing
+                (" ✓", Style::default().fg(Color::Green))
+            } else {
+                // Close to threshold (within 5 Lc)
+                (" ⚠", Style::default().fg(Color::Yellow))
+            }
+        } else {
+            // Failing
+            (" ✗", Style::default().fg(Color::Red))
+        }
     }
 
     fn scroll_up(&mut self) {

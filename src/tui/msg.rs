@@ -30,8 +30,9 @@ pub enum Msg {
     ForegroundHChanged(f32),
 
     // Numeric parameter changes
-    TargetContrastChanged(f64),
-    ExtendedContrastChanged(f64),
+    MinContrastChanged(f64),
+    ExtendedMinContrastChanged(f64),
+    MaxLightnessAdjustmentChanged(f32),
     AccentChromaChanged(f32),
     ExtendedChromaChanged(f32),
 

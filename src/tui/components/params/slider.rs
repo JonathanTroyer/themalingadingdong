@@ -20,8 +20,9 @@ use crate::tui::msg::Msg;
 /// Type of slider (determines which Msg to send on change).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliderType {
-    TargetContrast,
-    ExtendedContrast,
+    MinContrast,
+    ExtendedMinContrast,
+    MaxLightnessAdjustment,
     AccentChroma,
     ExtendedChroma,
     LightnessStrength,
@@ -48,7 +49,7 @@ impl Default for SliderConfig {
             step: 1.0,
             precision: 2,
             suffix: String::new(),
-            slider_type: SliderType::TargetContrast,
+            slider_type: SliderType::MinContrast,
         }
     }
 }
@@ -225,8 +226,11 @@ impl Component<Msg, UserEvent> for Slider {
 impl Slider {
     fn msg_for_change(&self) -> Option<Msg> {
         match self.config.slider_type {
-            SliderType::TargetContrast => Some(Msg::TargetContrastChanged(self.value)),
-            SliderType::ExtendedContrast => Some(Msg::ExtendedContrastChanged(self.value)),
+            SliderType::MinContrast => Some(Msg::MinContrastChanged(self.value)),
+            SliderType::ExtendedMinContrast => Some(Msg::ExtendedMinContrastChanged(self.value)),
+            SliderType::MaxLightnessAdjustment => {
+                Some(Msg::MaxLightnessAdjustmentChanged(self.value as f32))
+            }
             SliderType::AccentChroma => Some(Msg::AccentChromaChanged(self.value as f32)),
             SliderType::ExtendedChroma => Some(Msg::ExtendedChromaChanged(self.value as f32)),
             SliderType::LightnessStrength => {

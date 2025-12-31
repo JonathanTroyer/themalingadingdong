@@ -2,7 +2,7 @@
 
 use palette::{IntoColor, Oklch, Srgb};
 
-use crate::contrast_solver::solve_lightness_for_contrast;
+use crate::contrast_solver::{find_uniform_lightness, solve_lightness_for_contrast};
 use crate::curves::{InterpolationConfig, evaluate_curve};
 
 /// Default hues for base16 accent colors (base08-base0F).
@@ -56,20 +56,22 @@ pub fn build_hues_with_overrides(overrides: &[Option<f32>; 8]) -> [f32; 8] {
     hues
 }
 
-/// Result of generating an accent color with per-hue contrast solving.
+/// Result of generating an accent color with contrast optimization.
 #[derive(Debug, Clone)]
 pub struct AccentResult {
     /// The generated sRGB color
     pub color: Srgb<f32>,
     /// The hue used (degrees, 0-360)
     pub hue: f32,
-    /// The lightness solved for this specific hue
+    /// The lightness for this hue
     pub lightness: f32,
+    /// Adjustment from base lightness (for uniform lightness mode)
+    pub adjustment: f32,
     /// The APCA contrast achieved
     pub achieved_contrast: f64,
-    /// Whether target contrast was achieved exactly
-    pub is_exact: bool,
-    /// Warning if target couldn't be achieved for this hue
+    /// Whether minimum contrast was achieved
+    pub met_minimum: bool,
+    /// Warning if minimum couldn't be achieved for this hue
     pub warning: Option<String>,
 }
 
@@ -264,10 +266,70 @@ pub fn generate_hues(start_hue: f32, count: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Generate accent colors with per-hue contrast solving.
+/// Generate accent colors with uniform lightness optimization.
 ///
-/// This is Step 2 of the two-step accent generation process: for each hue,
-/// solve for the lightness that achieves target contrast against the background.
+/// All hues share a near-uniform lightness while meeting minimum contrast.
+/// This produces more visually cohesive accent colors compared to per-hue
+/// exact contrast optimization.
+///
+/// # Arguments
+///
+/// * `hues` - Array of hue values (from `build_hues_with_overrides()`)
+/// * `chroma` - Chroma for all accents
+/// * `min_contrast` - Minimum APCA Lc value (floor, not exact target)
+/// * `max_adjustment` - Maximum per-hue lightness adjustment allowed
+/// * `background` - Background color for contrast calculation
+///
+/// # Returns
+///
+/// Vector of `AccentResult` with uniform-lightness colors and any warnings.
+///
+/// # Example
+///
+/// ```
+/// use palette::Srgb;
+/// use themalingadingdong::interpolation::{build_hues_with_overrides, generate_accents_uniform};
+///
+/// let bg = Srgb::new(26u8, 26, 46);
+/// let hues = build_hues_with_overrides(&[None; 8]);
+/// let accents = generate_accents_uniform(&hues, 0.12, 60.0, 0.02, bg);
+/// assert_eq!(accents.len(), 8);
+/// ```
+pub fn generate_accents_uniform(
+    hues: &[f32],
+    chroma: f32,
+    min_contrast: f64,
+    max_adjustment: f32,
+    background: Srgb<u8>,
+) -> Vec<AccentResult> {
+    let result = find_uniform_lightness(background, hues, chroma, min_contrast, max_adjustment);
+
+    result
+        .hue_results
+        .into_iter()
+        .map(|hr| {
+            let oklch = Oklch::new(hr.lightness, chroma, hr.hue);
+            let linear_srgb: palette::LinSrgb<f32> = oklch.into_color();
+            let color = Srgb::from_linear(linear_srgb);
+
+            AccentResult {
+                color,
+                hue: hr.hue,
+                lightness: hr.lightness,
+                adjustment: hr.adjustment,
+                achieved_contrast: hr.achieved_contrast,
+                met_minimum: hr.met_minimum,
+                warning: hr.warning,
+            }
+        })
+        .collect()
+}
+
+/// Generate accent colors with per-hue contrast solving (legacy mode).
+///
+/// This is the original approach where each hue gets its own optimal lightness
+/// to achieve the exact target contrast. For uniform lightness optimization,
+/// use `generate_accents_uniform` instead.
 ///
 /// # Arguments
 ///
@@ -279,18 +341,7 @@ pub fn generate_hues(start_hue: f32, count: usize) -> Vec<f32> {
 /// # Returns
 ///
 /// Vector of `AccentResult` with color, metadata, and any warnings.
-///
-/// # Example
-///
-/// ```
-/// use palette::Srgb;
-/// use themalingadingdong::interpolation::{generate_hues, generate_accents_for_contrast};
-///
-/// let bg = Srgb::new(26u8, 26, 46);
-/// let hues = generate_hues(25.0, 8);
-/// let accents = generate_accents_for_contrast(&hues, 0.12, 60.0, bg);
-/// assert_eq!(accents.len(), 8);
-/// ```
+#[deprecated(since = "0.3.0", note = "Use generate_accents_uniform instead")]
 pub fn generate_accents_for_contrast(
     hues: &[f32],
     chroma: f32,
@@ -310,8 +361,9 @@ pub fn generate_accents_for_contrast(
                 color,
                 hue,
                 lightness: solve_result.lightness,
+                adjustment: 0.0, // No adjustment in per-hue mode
                 achieved_contrast: solve_result.achieved_contrast,
-                is_exact: solve_result.is_exact,
+                met_minimum: solve_result.is_exact,
                 warning: solve_result.warning,
             }
         })

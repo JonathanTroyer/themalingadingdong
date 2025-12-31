@@ -1,7 +1,7 @@
 //! Palette validation with APCA contrast checking.
 
 use float_cmp::approx_eq;
-use palette::Srgb;
+use palette::{IntoColor, Oklch, Srgb};
 use tinted_builder::Base16Scheme;
 
 use crate::apca::{Threshold, apca_contrast, thresholds};
@@ -20,6 +20,8 @@ pub struct ValidationResult {
     pub pair: ValidationPair,
     pub contrast: f64,
     pub passes: bool,
+    /// OKLCH values of the foreground color (only for accent colors base08-base17).
+    pub fg_oklch: Option<Oklch>,
 }
 
 /// Get the default validation pairs for a base16/24 scheme.
@@ -37,11 +39,12 @@ pub fn default_validation_pairs() -> Vec<ValidationPair> {
         }
     }
 
-    // Accent colors (base08-base0F) on backgrounds (base00-base02)
+    // Accent colors (base08-base0F) on backgrounds (base00-base01)
+    // Solver optimizes against base00; base01 shown for reference
     for fg in [
         "base08", "base09", "base0A", "base0B", "base0C", "base0D", "base0E", "base0F",
     ] {
-        for bg in ["base00", "base01", "base02"] {
+        for bg in ["base00", "base01"] {
             pairs.push(ValidationPair {
                 foreground: fg,
                 background: bg,
@@ -50,11 +53,11 @@ pub fn default_validation_pairs() -> Vec<ValidationPair> {
         }
     }
 
-    // Extended accent colors (base10-base17) on backgrounds (base00-base02)
+    // Extended accent colors (base10-base17) on backgrounds (base00-base01)
     for fg in [
         "base10", "base11", "base12", "base13", "base14", "base15", "base16", "base17",
     ] {
-        for bg in ["base00", "base01", "base02"] {
+        for bg in ["base00", "base01"] {
             pairs.push(ValidationPair {
                 foreground: fg,
                 background: bg,
@@ -64,6 +67,29 @@ pub fn default_validation_pairs() -> Vec<ValidationPair> {
     }
 
     pairs
+}
+
+/// Check if a color name is an accent color (base08-base0F or base10-base17).
+fn is_accent_color(name: &str) -> bool {
+    matches!(
+        name,
+        "base08"
+            | "base09"
+            | "base0A"
+            | "base0B"
+            | "base0C"
+            | "base0D"
+            | "base0E"
+            | "base0F"
+            | "base10"
+            | "base11"
+            | "base12"
+            | "base13"
+            | "base14"
+            | "base15"
+            | "base16"
+            | "base17"
+    )
 }
 
 /// Validate a scheme and return results for all pairs.
@@ -85,16 +111,26 @@ pub fn validate(scheme: &Base16Scheme) -> Vec<ValidationResult> {
                     let passes = abs_contrast > threshold
                         || approx_eq!(f64, abs_contrast, threshold, epsilon = 0.5);
 
+                    // Compute OKLCH for accent colors
+                    let fg_oklch = if is_accent_color(pair.foreground) {
+                        let fg_f32: Srgb<f32> = fg_srgb.into_format();
+                        Some(fg_f32.into_color())
+                    } else {
+                        None
+                    };
+
                     ValidationResult {
                         pair,
                         contrast,
                         passes,
+                        fg_oklch,
                     }
                 }
                 _ => ValidationResult {
                     pair,
                     contrast: 0.0,
                     passes: false,
+                    fg_oklch: None,
                 },
             }
         })

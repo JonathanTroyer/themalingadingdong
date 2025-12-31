@@ -149,17 +149,25 @@ impl HueOverrides {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ContrastConfig {
-    /// Target APCA contrast for accent colors (Lc value)
-    pub target: f64,
-    /// Target APCA contrast for extended accent colors (Lc value)
-    pub extended: f64,
+    /// Minimum APCA contrast for accent colors (Lc value).
+    /// Colors will achieve at least this contrast while maintaining uniform lightness.
+    #[serde(alias = "target")]
+    pub minimum: f64,
+    /// Minimum APCA contrast for extended accent colors (Lc value)
+    #[serde(alias = "extended")]
+    pub extended_minimum: f64,
+    /// Maximum per-hue lightness adjustment allowed (0.0-0.1, default 0.02).
+    /// Small adjustments help difficult hues reach minimum contrast while
+    /// keeping colors near-uniform.
+    pub max_adjustment: f32,
 }
 
 impl Default for ContrastConfig {
     fn default() -> Self {
         Self {
-            target: 75.0,
-            extended: 60.0,
+            minimum: 75.0,
+            extended_minimum: 60.0,
+            max_adjustment: 0.02,
         }
     }
 }
@@ -208,8 +216,9 @@ impl ThemeConfig {
             background,
             foreground,
             hue_overrides,
-            target_contrast: self.contrast.target,
-            extended_contrast: self.contrast.extended,
+            min_contrast: self.contrast.minimum,
+            extended_min_contrast: self.contrast.extended_minimum,
+            max_lightness_adjustment: self.contrast.max_adjustment,
             accent_chroma: self.colors.accent_chroma.unwrap_or(defaults.accent_chroma),
             extended_chroma: self
                 .colors
@@ -248,8 +257,9 @@ impl ThemeConfig {
             },
             curves: config.interpolation.clone(),
             contrast: ContrastConfig {
-                target: config.target_contrast,
-                extended: config.extended_contrast,
+                minimum: config.min_contrast,
+                extended_minimum: config.extended_min_contrast,
+                max_adjustment: config.max_lightness_adjustment,
             },
         }
     }

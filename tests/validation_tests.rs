@@ -30,7 +30,7 @@ fn test_high_contrast_scheme_passes() {
     let config = GenerateConfig {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
-        target_contrast: 75.0,
+        min_contrast: 75.0,
         accent_chroma: 0.1,
         ..Default::default()
     };
@@ -53,7 +53,7 @@ fn test_validate_with_warnings_returns_failures() {
     let config = GenerateConfig {
         background: Srgb::new(30u8, 30, 40),
         foreground: Srgb::new(200u8, 200, 200),
-        target_contrast: 45.0,
+        min_contrast: 45.0,
         accent_chroma: 0.15,
         ..Default::default()
     };
@@ -78,7 +78,7 @@ fn test_accent_colors_meet_target_contrast() {
     let config = GenerateConfig {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
-        target_contrast: 75.0,
+        min_contrast: 75.0,
         accent_chroma: 0.1,
         ..Default::default()
     };

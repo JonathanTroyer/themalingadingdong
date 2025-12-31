@@ -60,14 +60,14 @@ fn test_cli_includes_all_base24_colors() {
 
 #[test]
 fn test_cli_no_adjust_with_low_contrast_fails() {
-    // Very low target contrast may not meet validation thresholds
+    // Very low minimum contrast may not meet validation thresholds
     cmd()
         .args([
             "--background",
             "#1a1a2e",
             "--foreground",
             "#eaeaea",
-            "--target-contrast",
+            "--min-contrast",
             "30", // Very low contrast
             "--name",
             "Test",
@@ -80,14 +80,14 @@ fn test_cli_no_adjust_with_low_contrast_fails() {
 
 #[test]
 fn test_cli_high_contrast_passes_without_adjust() {
-    // High target contrast on dark background should mostly pass
+    // High minimum contrast on dark background should mostly pass
     cmd()
         .args([
             "--background",
             "#000000",
             "--foreground",
             "#ffffff",
-            "--target-contrast",
+            "--min-contrast",
             "90",
             "--accent-chroma",
             "0.05",

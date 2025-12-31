@@ -114,10 +114,10 @@ fn run_loop(
                 .constraints([Constraint::Min(10), Constraint::Length(13)])
                 .split(cols[0]);
 
-            // Right column: Parameters + Validation
+            // Right column: Parameters (fixed) + Validation (grows)
             let right_rows = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(20), Constraint::Length(8)])
+                .constraints([Constraint::Length(21), Constraint::Min(8)])
                 .split(cols[1]);
 
             // Render components

@@ -74,17 +74,23 @@ pub struct Cli {
     )]
     pub foreground: Option<String>,
 
-    /// Target APCA contrast for accent colors (Lc 75 = body text, 90 = small text)
+    /// Minimum APCA contrast for accent colors (floor, not exact target)
+    /// Colors will achieve at least this contrast while maintaining uniform lightness.
     #[arg(long, default_value_t = 75.0)]
-    pub target_contrast: f64,
+    pub min_contrast: f64,
+
+    /// Minimum APCA contrast for extended accent colors base10-base17
+    #[arg(long, default_value_t = 60.0)]
+    pub extended_min_contrast: f64,
+
+    /// Maximum per-hue lightness adjustment (0.0-0.1, default 0.02)
+    /// Small adjustments help difficult hues reach minimum contrast.
+    #[arg(long, default_value_t = 0.02)]
+    pub max_lightness_adjustment: f32,
 
     /// Chroma for accent colors (0.0-0.4 typical, higher = more saturated)
     #[arg(long, default_value_t = 0.15)]
     pub accent_chroma: f32,
-
-    /// Target APCA contrast for extended accent colors base10-base17 (Lc 60 = large text)
-    #[arg(long, default_value_t = 60.0)]
-    pub extended_contrast: f64,
 
     /// Chroma for extended accent colors base10-base17 (0.0-0.4 typical)
     #[arg(long, default_value_t = 0.20)]

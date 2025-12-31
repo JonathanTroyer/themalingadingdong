@@ -77,8 +77,9 @@ pub struct Model {
     // Editable parameters
     pub background_oklch: OklchComponents,
     pub foreground_oklch: OklchComponents,
-    pub target_contrast: f64,
-    pub extended_contrast: f64,
+    pub min_contrast: f64,
+    pub extended_min_contrast: f64,
+    pub max_lightness_adjustment: f32,
     pub accent_chroma: f32,
     pub extended_chroma: f32,
     pub hue_overrides: [Option<f32>; 8],
@@ -126,8 +127,9 @@ impl Model {
         Ok(Self {
             background_oklch,
             foreground_oklch,
-            target_contrast: cli.target_contrast,
-            extended_contrast: cli.extended_contrast,
+            min_contrast: cli.min_contrast,
+            extended_min_contrast: cli.extended_min_contrast,
+            max_lightness_adjustment: cli.max_lightness_adjustment,
             accent_chroma: cli.accent_chroma,
             extended_chroma: cli.extended_chroma,
             hue_overrides: cli.hue_overrides(),
@@ -155,8 +157,9 @@ impl Model {
             background: self.background,
             foreground: self.foreground,
             hue_overrides: self.hue_overrides,
-            target_contrast: self.target_contrast,
-            extended_contrast: self.extended_contrast,
+            min_contrast: self.min_contrast,
+            extended_min_contrast: self.extended_min_contrast,
+            max_lightness_adjustment: self.max_lightness_adjustment,
             accent_chroma: self.accent_chroma,
             extended_chroma: self.extended_chroma,
             name: self.name.clone(),
@@ -250,12 +253,16 @@ impl Update<Msg> for Model {
             }
 
             // Numeric parameters
-            Msg::TargetContrastChanged(v) => {
-                self.target_contrast = v;
+            Msg::MinContrastChanged(v) => {
+                self.min_contrast = v;
                 Some(Msg::Regenerate)
             }
-            Msg::ExtendedContrastChanged(v) => {
-                self.extended_contrast = v;
+            Msg::ExtendedMinContrastChanged(v) => {
+                self.extended_min_contrast = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::MaxLightnessAdjustmentChanged(v) => {
+                self.max_lightness_adjustment = v;
                 Some(Msg::Regenerate)
             }
             Msg::AccentChromaChanged(v) => {

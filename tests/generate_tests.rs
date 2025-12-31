@@ -93,8 +93,9 @@ fn test_generate_creates_scheme() {
         background: Srgb::new(26u8, 26, 46),
         foreground: Srgb::new(234u8, 234, 234),
         hue_overrides: [None; 8], // Use default hues
-        target_contrast: 75.0,
-        extended_contrast: 60.0,
+        min_contrast: 75.0,
+        extended_min_contrast: 60.0,
+        max_lightness_adjustment: 0.02,
         accent_chroma: 0.25,
         extended_chroma: 0.20,
         name: "Test Scheme".to_string(),
