@@ -12,12 +12,14 @@ pub enum Id {
     ForegroundPicker,
     TargetContrast,
     ExtendedContrast,
-    AccentChroma,
-    ExtendedChroma,
+    AccentColorfulness,
+    ExtendedColorfulness,
     LightnessCurve,
     LightnessStrength,
     ChromaCurve,
+    ChromaStrength,
     HueCurve,
+    HueStrength,
     HueOverrides,
 
     // Scrollable panel

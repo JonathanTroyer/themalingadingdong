@@ -31,7 +31,7 @@ const EXP_BG_DARK: f64 = 0.65;
 const EXP_FG_DARK: f64 = 0.62;
 
 /// Convert an sRGB color to APCA luminance (Y).
-fn srgb_to_luminance(color: Srgb<u8>) -> f64 {
+pub fn srgb_to_luminance(color: Srgb<u8>) -> f64 {
     let r_lin = (color.red as f64 / 255.0).powf(GAMMA);
     let g_lin = (color.green as f64 / 255.0).powf(GAMMA);
     let b_lin = (color.blue as f64 / 255.0).powf(GAMMA);
@@ -89,6 +89,54 @@ pub fn apca_contrast(fg: Srgb<u8>, bg: Srgb<u8>) -> f64 {
         (c - OFFSET) * 100.0
     } else {
         (c + OFFSET) * 100.0
+    }
+}
+
+/// Invert APCA to find foreground luminance (Y) for a target contrast.
+///
+/// Given a background luminance and target Lc, computes the foreground Y
+/// that would achieve that contrast. This is useful for establishing
+/// search bounds when solving for lightness.
+///
+/// # Arguments
+///
+/// * `bg_y` - Background luminance (Y), typically from `srgb_to_luminance()`
+/// * `target_lc` - Target APCA contrast (absolute value, e.g., 75.0)
+/// * `is_dark_bg` - True if background is dark (Y < 0.18), false if light
+///
+/// # Returns
+///
+/// `Some(fg_y)` if the target is achievable, `None` if physically impossible.
+///
+/// # Note
+///
+/// This inversion ignores the low-luminance soft clamp for simplicity,
+/// so results near Y=0 may be approximate.
+pub fn invert_apca_for_y(bg_y: f64, target_lc: f64, is_dark_bg: bool) -> Option<f64> {
+    let lc_abs = target_lc.abs();
+
+    if is_dark_bg {
+        // Dark bg formula: Lc = SCALE * (Y_bg^EXP_BG_DARK - Y_fg^EXP_FG_DARK + OFFSET) * 100
+        // Solving for Y_fg:
+        // Y_fg^EXP_FG_DARK = Y_bg^EXP_BG_DARK + OFFSET - lc_abs / (SCALE * 100)
+        let rhs = bg_y.powf(EXP_BG_DARK) + OFFSET - lc_abs / (SCALE * 100.0);
+
+        if rhs <= 0.0 {
+            return None; // Target unreachable
+        }
+
+        Some(rhs.powf(1.0 / EXP_FG_DARK))
+    } else {
+        // Light bg formula: Lc = SCALE * (Y_bg^EXP_BG_LIGHT - Y_fg^EXP_FG_LIGHT - OFFSET) * 100
+        // Solving for Y_fg:
+        // Y_fg^EXP_FG_LIGHT = Y_bg^EXP_BG_LIGHT - OFFSET - lc_abs / (SCALE * 100)
+        let rhs = bg_y.powf(EXP_BG_LIGHT) - OFFSET - lc_abs / (SCALE * 100.0);
+
+        if rhs <= 0.0 {
+            return None; // Target unreachable
+        }
+
+        Some(rhs.powf(1.0 / EXP_FG_LIGHT))
     }
 }
 

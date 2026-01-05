@@ -3,7 +3,7 @@ use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
 
 fn cmd() -> Command {
-    cargo_bin_cmd!("themalingadingdong").into()
+    cargo_bin_cmd!("themalingadingdong")
 }
 
 #[test]
@@ -89,8 +89,8 @@ fn test_cli_high_contrast_passes_without_adjust() {
             "#ffffff",
             "--min-contrast",
             "90",
-            "--accent-chroma",
-            "0.05",
+            "--accent-colorfulness",
+            "10",
             "--name",
             "High Contrast",
         ])

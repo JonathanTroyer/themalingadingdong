@@ -51,13 +51,15 @@ fn test_interpolate_lightness_monotonic() {
 
 #[test]
 fn test_generate_accent_hues_correct_count() {
-    let accents = generate_accent_hues(25.0, 0.7, 0.12, 8);
+    // HellwigJmh: lightness=70, colorfulness=15 (was OKLCH L=0.7, chroma=0.12)
+    let accents = generate_accent_hues(25.0, 70.0, 15.0, 8);
     assert_eq!(accents.len(), 8);
 }
 
 #[test]
 fn test_generate_accent_hues_different_colors() {
-    let accents = generate_accent_hues(0.0, 0.7, 0.15, 8);
+    // HellwigJmh: lightness=70, colorfulness=25 (was OKLCH L=0.7, chroma=0.15)
+    let accents = generate_accent_hues(0.0, 70.0, 25.0, 8);
 
     // All colors should be different
     for i in 0..accents.len() {
@@ -95,9 +97,9 @@ fn test_generate_creates_scheme() {
         hue_overrides: [None; 8], // Use default hues
         min_contrast: 75.0,
         extended_min_contrast: 60.0,
-        max_lightness_adjustment: 0.02,
-        accent_chroma: 0.25,
-        extended_chroma: 0.20,
+        max_lightness_adjustment: 2.0,
+        accent_colorfulness: 25.0,
+        extended_colorfulness: 30.0,
         name: "Test Scheme".to_string(),
         author: Some("Test Author".to_string()),
         interpolation: InterpolationConfig::default(),

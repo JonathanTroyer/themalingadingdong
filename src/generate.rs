@@ -9,8 +9,8 @@ use tinted_builder::{Base16Scheme, Color, SchemeSystem, SchemeVariant};
 
 use crate::curves::InterpolationConfig;
 use crate::interpolation::{
-    build_hues_with_overrides, generate_accents_uniform, interpolate_with_curves, oklch_lightness,
-    srgb_to_f32, srgb_to_hex, srgb_to_u8,
+    build_hues_with_overrides, generate_accents_uniform, hellwig_lightness,
+    interpolate_with_curves, srgb_to_f32, srgb_to_hex, srgb_to_u8,
 };
 
 /// Result of palette generation including any warnings.
@@ -37,13 +37,13 @@ pub struct GenerateConfig {
     pub min_contrast: f64,
     /// Minimum APCA contrast for extended accent colors base10-base17 (Lc value)
     pub extended_min_contrast: f64,
-    /// Maximum per-hue lightness adjustment allowed (0.0-0.1, default 0.02).
+    /// Maximum per-hue lightness adjustment allowed (0-10 J' units, default 2.0).
     /// Small adjustments help difficult hues reach minimum contrast.
     pub max_lightness_adjustment: f32,
-    /// Chroma for accent colors (typically 0.1-0.2)
-    pub accent_chroma: f32,
-    /// Chroma for extended accent colors base10-base17
-    pub extended_chroma: f32,
+    /// Colorfulness for accent colors (HellwigJmh M, typically 15-30)
+    pub accent_colorfulness: f32,
+    /// Colorfulness for extended accent colors base10-base17 (HellwigJmh M)
+    pub extended_colorfulness: f32,
     /// Scheme name
     pub name: String,
     /// Author name (optional)
@@ -60,9 +60,9 @@ impl Default for GenerateConfig {
             hue_overrides: [None; 8],               // Use DEFAULT_BASE16_HUES
             min_contrast: 75.0,
             extended_min_contrast: 60.0,
-            max_lightness_adjustment: 0.02,
-            accent_chroma: 0.15,
-            extended_chroma: 0.20,
+            max_lightness_adjustment: 2.0,
+            accent_colorfulness: 25.0,
+            extended_colorfulness: 35.0,
             name: "Generated Scheme".to_string(),
             author: None,
             interpolation: InterpolationConfig::default(),
@@ -87,8 +87,8 @@ pub fn generate_for_variant(
     forced_variant: Option<SchemeVariant>,
 ) -> GenerationResult {
     // Sort colors by luminance
-    let bg_l = oklch_lightness(config.background);
-    let fg_l = oklch_lightness(config.foreground);
+    let bg_l = hellwig_lightness(config.background);
+    let fg_l = hellwig_lightness(config.foreground);
     let (darker, lighter) = if bg_l < fg_l {
         (config.background, config.foreground)
     } else {
@@ -126,7 +126,7 @@ pub fn generate_for_variant(
     // Step 2: Generate base accents (base08-base0F) with uniform lightness
     let base_accent_results = generate_accents_uniform(
         &accent_hues,
-        config.accent_chroma,
+        config.accent_colorfulness,
         config.min_contrast,
         config.max_lightness_adjustment,
         background,
@@ -142,7 +142,7 @@ pub fn generate_for_variant(
     // Step 2b: Generate extended accents (base10-base17) with uniform lightness
     let extended_accent_results = generate_accents_uniform(
         &accent_hues,
-        config.extended_chroma,
+        config.extended_colorfulness,
         config.extended_min_contrast,
         config.max_lightness_adjustment,
         background,

@@ -5,7 +5,7 @@ use std::time::Duration;
 use tuirealm::{Application, EventListenerCfg};
 
 use super::components::params::{
-    CycleSelector, HueGrid, OklchPicker, OklchPickerType, OklchValues, SelectorType, Slider,
+    CycleSelector, HellwigPicker, HellwigPickerType, HellwigValues, HueGrid, SelectorType, Slider,
     SliderConfig, SliderType,
 };
 use super::components::{Palette, Preview, Validation};
@@ -16,18 +16,20 @@ use super::msg::Msg;
 use crate::curves::CurveType;
 
 /// All focusable component IDs in order.
-/// Some may be conditionally hidden (like LightnessStrength).
+/// Some may be conditionally hidden (like strength sliders when sigmoid not selected).
 const ALL_FOCUS_IDS: &[Id] = &[
     Id::BackgroundPicker,
     Id::ForegroundPicker,
     Id::LightnessCurve,
     Id::LightnessStrength,
     Id::ChromaCurve,
+    Id::ChromaStrength,
     Id::HueCurve,
+    Id::HueStrength,
     Id::TargetContrast,
     Id::ExtendedContrast,
-    Id::AccentChroma,
-    Id::ExtendedChroma,
+    Id::AccentColorfulness,
+    Id::ExtendedColorfulness,
     Id::HueOverrides,
     Id::Validation,
 ];
@@ -61,25 +63,25 @@ pub fn mount_components(
     app.mount(Id::Preview, Box::new(preview), vec![])?;
 
     // Parameter components
-    let bg_picker = OklchPicker::new(
-        OklchPickerType::Background,
-        OklchValues {
-            lightness: model.background_oklch.lightness,
-            chroma: model.background_oklch.chroma,
-            hue: model.background_oklch.hue,
-            out_of_gamut: model.background_oklch.out_of_gamut,
+    let bg_picker = HellwigPicker::new(
+        HellwigPickerType::Background,
+        HellwigValues {
+            lightness: model.background_hellwig.lightness,
+            colorfulness: model.background_hellwig.colorfulness,
+            hue: model.background_hellwig.hue,
+            out_of_gamut: model.background_hellwig.out_of_gamut,
         },
         model.background,
     );
     app.mount(Id::BackgroundPicker, Box::new(bg_picker), vec![])?;
 
-    let fg_picker = OklchPicker::new(
-        OklchPickerType::Foreground,
-        OklchValues {
-            lightness: model.foreground_oklch.lightness,
-            chroma: model.foreground_oklch.chroma,
-            hue: model.foreground_oklch.hue,
-            out_of_gamut: model.foreground_oklch.out_of_gamut,
+    let fg_picker = HellwigPicker::new(
+        HellwigPickerType::Foreground,
+        HellwigValues {
+            lightness: model.foreground_hellwig.lightness,
+            colorfulness: model.foreground_hellwig.colorfulness,
+            hue: model.foreground_hellwig.hue,
+            out_of_gamut: model.foreground_hellwig.out_of_gamut,
         },
         model.foreground,
     );
@@ -88,9 +90,9 @@ pub fn mount_components(
     let hue_grid = HueGrid::new(model.hue_overrides);
     app.mount(Id::HueOverrides, Box::new(hue_grid), vec![])?;
 
-    // Curve selectors for L/C/H interpolation
+    // Curve selectors for J/M/h interpolation
     let lightness_curve = CycleSelector::new(
-        "L Curve",
+        "J Curve",
         curve_type_options(),
         curve_type_index(model.interpolation.lightness.curve_type),
         SelectorType::Lightness,
@@ -113,22 +115,52 @@ pub fn mount_components(
     app.mount(Id::LightnessStrength, Box::new(lightness_strength), vec![])?;
 
     let chroma_curve = CycleSelector::new(
-        "C Curve",
+        "M Curve",
         curve_type_options(),
         curve_type_index(model.interpolation.chroma.curve_type),
         SelectorType::Chroma,
     );
     app.mount(Id::ChromaCurve, Box::new(chroma_curve), vec![])?;
 
+    // Strength slider for chroma sigmoid curve
+    let chroma_strength = Slider::new(
+        SliderConfig {
+            label: "  Strength".to_string(),
+            min: 0.1,
+            max: 5.0,
+            step: 0.05,
+            precision: 2,
+            suffix: String::new(),
+            slider_type: SliderType::ChromaStrength,
+        },
+        f64::from(model.interpolation.chroma.strength),
+    );
+    app.mount(Id::ChromaStrength, Box::new(chroma_strength), vec![])?;
+
     let hue_curve = CycleSelector::new(
-        "H Curve",
+        "h Curve",
         curve_type_options(),
         curve_type_index(model.interpolation.hue.curve_type),
         SelectorType::Hue,
     );
     app.mount(Id::HueCurve, Box::new(hue_curve), vec![])?;
 
-    // Contrast and chroma sliders
+    // Strength slider for hue sigmoid curve
+    let hue_strength = Slider::new(
+        SliderConfig {
+            label: "  Strength".to_string(),
+            min: 0.1,
+            max: 5.0,
+            step: 0.05,
+            precision: 2,
+            suffix: String::new(),
+            slider_type: SliderType::HueStrength,
+        },
+        f64::from(model.interpolation.hue.strength),
+    );
+    app.mount(Id::HueStrength, Box::new(hue_strength), vec![])?;
+
+    // Contrast and colorfulness sliders
     let min_contrast = Slider::new(
         SliderConfig {
             label: "Min Lc".to_string(),
@@ -161,33 +193,42 @@ pub fn mount_components(
         vec![],
     )?;
 
-    let accent_chroma = Slider::new(
+    // Colorfulness sliders (HellwigJmh M scale, 0-50 is typical for UI accents)
+    let accent_colorfulness = Slider::new(
         SliderConfig {
-            label: "Accent C".to_string(),
+            label: "Accent M".to_string(),
             min: 0.0,
-            max: 0.4,
-            step: 0.01,
-            precision: 2,
+            max: 50.0,
+            step: 1.0,
+            precision: 0,
             suffix: String::new(),
-            slider_type: SliderType::AccentChroma,
+            slider_type: SliderType::AccentColorfulness,
         },
-        f64::from(model.accent_chroma),
+        f64::from(model.accent_colorfulness),
     );
-    app.mount(Id::AccentChroma, Box::new(accent_chroma), vec![])?;
+    app.mount(
+        Id::AccentColorfulness,
+        Box::new(accent_colorfulness),
+        vec![],
+    )?;
 
-    let extended_chroma = Slider::new(
+    let extended_colorfulness = Slider::new(
         SliderConfig {
-            label: "Extended C".to_string(),
+            label: "Extended M".to_string(),
             min: 0.0,
-            max: 0.4,
-            step: 0.01,
-            precision: 2,
+            max: 50.0,
+            step: 1.0,
+            precision: 0,
             suffix: String::new(),
-            slider_type: SliderType::ExtendedChroma,
+            slider_type: SliderType::ExtendedColorfulness,
         },
-        f64::from(model.extended_chroma),
+        f64::from(model.extended_colorfulness),
     );
-    app.mount(Id::ExtendedChroma, Box::new(extended_chroma), vec![])?;
+    app.mount(
+        Id::ExtendedColorfulness,
+        Box::new(extended_colorfulness),
+        vec![],
+    )?;
 
     // Validation panel
     let mut validation = Validation::new();
@@ -247,17 +288,21 @@ impl FocusManager {
 
     /// Update which components are visible based on model state.
     pub fn update_visible(&mut self, model: &Model) {
-        let show_strength = model.interpolation.lightness.curve_type.uses_strength();
+        let show_lightness_strength = model.interpolation.lightness.curve_type.uses_strength();
+        let show_chroma_strength = model.interpolation.chroma.curve_type.uses_strength();
+        let show_hue_strength = model.interpolation.hue.curve_type.uses_strength();
 
         self.visible_ids = ALL_FOCUS_IDS
             .iter()
             .copied()
             .filter(|id| {
-                // LightnessStrength only visible when sigmoid selected
-                if *id == Id::LightnessStrength && !show_strength {
-                    return false;
+                // Strength sliders only visible when sigmoid selected for that curve
+                match *id {
+                    Id::LightnessStrength => show_lightness_strength,
+                    Id::ChromaStrength => show_chroma_strength,
+                    Id::HueStrength => show_hue_strength,
+                    _ => true,
                 }
-                true
             })
             .collect();
 

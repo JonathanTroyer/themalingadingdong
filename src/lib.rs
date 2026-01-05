@@ -4,6 +4,7 @@ pub mod config;
 pub mod contrast_solver;
 pub mod curves;
 pub mod generate;
+pub mod hellwig;
 pub mod interpolation;
 pub mod tui;
 pub mod validation;

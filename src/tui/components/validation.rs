@@ -16,12 +16,12 @@ use tuirealm::{
 
 use crate::tui::event::{UserEvent, dispatcher};
 use crate::tui::msg::Msg;
-use crate::validation::ValidationResult;
+use crate::validation::{ValidationResult, ValidationResults};
 
 /// Validation results display with scrolling.
 pub struct Validation {
     props: Props,
-    results: Vec<ValidationResult>,
+    results: Option<ValidationResults>,
     warnings: Vec<String>,
     scroll: u16,
     has_scheme: bool,
@@ -31,7 +31,7 @@ impl Validation {
     pub fn new() -> Self {
         Self {
             props: Props::default(),
-            results: Vec::new(),
+            results: None,
             warnings: Vec::new(),
             scroll: 0,
             has_scheme: false,
@@ -40,7 +40,7 @@ impl Validation {
 
     pub fn set_data(
         &mut self,
-        results: Vec<ValidationResult>,
+        results: Option<ValidationResults>,
         warnings: Vec<String>,
         has_scheme: bool,
     ) {
@@ -60,17 +60,22 @@ impl Validation {
             return lines;
         }
 
-        // Group results by foreground color, tracking contrast per background
+        let Some(ref results) = self.results else {
+            return lines;
+        };
+
+        // Build lookup maps for required and reference results
         struct ColorData<'a> {
             result: &'a ValidationResult,
             lc00: Option<f64>,
             lc01: Option<f64>,
-            worst_lc: f64,
-            worst_passes: bool,
+            passes: bool,
         }
 
         let mut fg_data: HashMap<&str, ColorData> = HashMap::new();
-        for result in &self.results {
+
+        // Process required results (these determine pass/fail)
+        for result in &results.required {
             let fg = result.pair.foreground;
             let bg = result.pair.background;
             let abs_contrast = result.contrast.abs();
@@ -79,22 +84,41 @@ impl Validation {
                 result,
                 lc00: None,
                 lc01: None,
-                worst_lc: f64::MAX,
-                worst_passes: true,
+                passes: true,
             });
 
-            // Track contrast per background
             match bg {
-                "base00" => entry.lc00 = Some(abs_contrast),
-                "base01" => entry.lc01 = Some(abs_contrast),
+                "base00" => {
+                    entry.lc00 = Some(abs_contrast);
+                    // For UI colors, track worst case; for accents, only base00 matters
+                    if !result.passes {
+                        entry.passes = false;
+                    }
+                }
+                "base01" => {
+                    entry.lc01 = Some(abs_contrast);
+                    // For UI colors, both must pass
+                    if !result.passes {
+                        entry.passes = false;
+                    }
+                }
                 _ => {}
             }
 
-            // Track worst case (lowest contrast)
-            if abs_contrast < entry.worst_lc {
-                entry.worst_lc = abs_contrast;
-                entry.worst_passes = result.passes;
+            // Keep the first result for HellwigJmh data
+            if entry.result.fg_hellwig.is_none() && result.fg_hellwig.is_some() {
                 entry.result = result;
+            }
+        }
+
+        // Process reference results (informational only, for Lc01 display on accents)
+        for result in &results.reference {
+            let fg = result.pair.foreground;
+            let abs_contrast = result.contrast.abs();
+
+            if let Some(entry) = fg_data.get_mut(fg) {
+                // Reference results are always base01
+                entry.lc01 = Some(abs_contrast);
             }
         }
 
@@ -107,8 +131,8 @@ impl Validation {
         let ui_colors = ["base06", "base07"];
         for fg in ui_colors {
             if let Some(data) = fg_data.get(fg) {
-                let threshold = data.result.pair.threshold.min_lc;
-                let (icon, style) = self.status_style(data.worst_passes, data.worst_lc, threshold);
+                // UI colors don't have HellwigJmh, so no clipping info
+                let (icon, style) = self.status_style(data.passes, false);
                 let lc00_str = data.lc00.map(|v| format!("{:.0}", v)).unwrap_or_default();
                 let lc01_str = data.lc01.map(|v| format!("{:.0}", v)).unwrap_or_default();
                 let text = format!(
@@ -129,7 +153,7 @@ impl Validation {
             Style::default().add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(Span::styled(
-            "       L     C     H   Lc00 Lc01".to_string(),
+            "       J     M     h   Lc00 Lc01".to_string(),
             Style::default().add_modifier(Modifier::DIM),
         )));
 
@@ -144,8 +168,7 @@ impl Validation {
                     data.result,
                     data.lc00,
                     data.lc01,
-                    data.worst_passes,
-                    data.worst_lc,
+                    data.passes,
                 ));
             }
         }
@@ -161,8 +184,7 @@ impl Validation {
                     data.result,
                     data.lc00,
                     data.lc01,
-                    data.worst_passes,
-                    data.worst_lc,
+                    data.passes,
                 ));
             }
         }
@@ -194,17 +216,14 @@ impl Validation {
         lc00: Option<f64>,
         lc01: Option<f64>,
         passes: bool,
-        worst_lc: f64,
     ) -> Line<'static> {
-        let threshold = result.pair.threshold.min_lc;
-        let (icon, style) = self.status_style(passes, worst_lc, threshold);
+        // Check if color was clipped (HellwigJmh out of sRGB gamut)
+        let is_clipped = result.fg_hellwig.map(|h| !h.is_in_gamut()).unwrap_or(false);
+        let (icon, style) = self.status_style(passes, is_clipped);
 
-        let (l, c, h) = result
-            .fg_oklch
-            .map(|oklch| {
-                let hue = oklch.hue.into_positive_degrees();
-                (oklch.l, oklch.chroma, hue)
-            })
+        let (j, m, h) = result
+            .fg_hellwig
+            .map(|hellwig| (hellwig.lightness, hellwig.colorfulness, hellwig.hue))
             .unwrap_or((0.0, 0.0, 0.0));
 
         let lc00_str = lc00
@@ -215,10 +234,10 @@ impl Validation {
             .unwrap_or_else(|| "  -".to_string());
 
         let text = format!(
-            "  {}  {:.2} {:.3} {:>5.1}  {} {}{}",
+            "  {} {:>5.1} {:>5.1} {:>5.1}  {} {}{}",
             &fg[4..],
-            l,
-            c,
+            j,
+            m,
             h,
             lc00_str,
             lc01_str,
@@ -227,19 +246,17 @@ impl Validation {
         Line::from(Span::styled(text, style))
     }
 
-    /// Get status icon and style based on contrast value.
-    fn status_style(&self, passes: bool, contrast: f64, threshold: f64) -> (&'static str, Style) {
-        if passes {
-            if contrast >= threshold + 5.0 {
-                // Comfortably passing
-                (" ✓", Style::default().fg(Color::Green))
-            } else {
-                // Close to threshold (within 5 Lc)
-                (" ⚠", Style::default().fg(Color::Yellow))
-            }
+    /// Get status message and style based on contrast and gamut.
+    fn status_style(&self, passes: bool, is_clipped: bool) -> (&'static str, Style) {
+        if !passes {
+            // Failing - contrast too low
+            (" Lc unreachable", Style::default().fg(Color::Red))
+        } else if is_clipped {
+            // Passing but color was clipped
+            (" clipped", Style::default().fg(Color::Yellow))
         } else {
-            // Failing
-            (" ✗", Style::default().fg(Color::Red))
+            // Passing, no issues
+            ("", Style::default().fg(Color::Green))
         }
     }
 

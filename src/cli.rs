@@ -51,7 +51,7 @@ impl From<CurveTypeArg> for CurveType {
     }
 }
 
-/// Base24 palette generator using OKLCH color space with APCA validation.
+/// Base24 palette generator using HellwigJmh color space with APCA validation.
 #[derive(Parser, Debug)]
 #[command(name = "themalingadingdong")]
 #[command(author, version, about, long_about = None)]
@@ -83,18 +83,18 @@ pub struct Cli {
     #[arg(long, default_value_t = 60.0)]
     pub extended_min_contrast: f64,
 
-    /// Maximum per-hue lightness adjustment (0.0-0.1, default 0.02)
+    /// Maximum per-hue lightness adjustment (0-10 J' units, default 2.0)
     /// Small adjustments help difficult hues reach minimum contrast.
-    #[arg(long, default_value_t = 0.02)]
+    #[arg(long, default_value_t = 2.0)]
     pub max_lightness_adjustment: f32,
 
-    /// Chroma for accent colors (0.0-0.4 typical, higher = more saturated)
-    #[arg(long, default_value_t = 0.15)]
-    pub accent_chroma: f32,
+    /// Colorfulness for accent colors (HellwigJmh M, 0-50 typical)
+    #[arg(long, default_value_t = 25.0)]
+    pub accent_colorfulness: f32,
 
-    /// Chroma for extended accent colors base10-base17 (0.0-0.4 typical)
-    #[arg(long, default_value_t = 0.20)]
-    pub extended_chroma: f32,
+    /// Colorfulness for extended accent colors base10-base17 (HellwigJmh M, 0-50 typical)
+    #[arg(long, default_value_t = 35.0)]
+    pub extended_colorfulness: f32,
 
     // Individual hue overrides (base08-base0F)
     // Default values come from DEFAULT_BASE16_HUES lookup table
@@ -160,7 +160,7 @@ pub struct Cli {
 
     // Curve configuration
     /// Lightness interpolation curve type
-    #[arg(long, value_enum, default_value_t = CurveTypeArg::Linear)]
+    #[arg(long, value_enum, default_value_t = CurveTypeArg::Smoothstep)]
     pub lightness_curve: CurveTypeArg,
 
     /// Lightness curve strength (for sigmoid, 1.0-10.0)

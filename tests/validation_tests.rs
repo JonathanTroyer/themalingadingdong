@@ -8,7 +8,7 @@ fn test_validate_returns_results() {
     let scheme = generate(&config).scheme;
 
     let results = validate(&scheme);
-    assert!(!results.is_empty());
+    assert!(!results.required.is_empty());
 }
 
 #[test]
@@ -16,7 +16,8 @@ fn test_validate_checks_contrast() {
     let config = GenerateConfig::default();
     let scheme = generate(&config).scheme;
 
-    for result in validate(&scheme) {
+    let results = validate(&scheme);
+    for result in &results.required {
         // Contrast should be calculated (non-zero for different colors)
         assert!(
             result.contrast.abs() > 0.0 || result.contrast == 0.0,
@@ -31,7 +32,7 @@ fn test_high_contrast_scheme_passes() {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
         min_contrast: 75.0,
-        accent_chroma: 0.1,
+        accent_colorfulness: 15.0,
         ..Default::default()
     };
 
@@ -40,6 +41,7 @@ fn test_high_contrast_scheme_passes() {
     // base07 (white) on base00 (black) should always pass
     let results = validate(&scheme);
     let base07_result = results
+        .required
         .iter()
         .find(|r| r.pair.foreground == "base07")
         .unwrap();
@@ -54,7 +56,7 @@ fn test_validate_with_warnings_returns_failures() {
         background: Srgb::new(30u8, 30, 40),
         foreground: Srgb::new(200u8, 200, 200),
         min_contrast: 45.0,
-        accent_chroma: 0.15,
+        accent_colorfulness: 25.0,
         ..Default::default()
     };
 
@@ -79,15 +81,16 @@ fn test_accent_colors_meet_target_contrast() {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
         min_contrast: 75.0,
-        accent_chroma: 0.1,
+        accent_colorfulness: 15.0,
         ..Default::default()
     };
 
     let scheme = generate(&config).scheme;
     let results = validate(&scheme);
 
-    // Accent colors should pass their validation (they're computed for contrast)
+    // Accent colors should pass their required validation (they're computed for contrast)
     let accent_failures: Vec<_> = results
+        .required
         .iter()
         .filter(|r| r.pair.foreground.starts_with("base0") && r.pair.foreground >= "base08")
         .filter(|r| !r.passes)

@@ -22,10 +22,11 @@ use crate::tui::msg::Msg;
 pub enum SliderType {
     MinContrast,
     ExtendedMinContrast,
-    MaxLightnessAdjustment,
-    AccentChroma,
-    ExtendedChroma,
+    AccentColorfulness,
+    ExtendedColorfulness,
     LightnessStrength,
+    ChromaStrength,
+    HueStrength,
 }
 
 /// Configuration for a slider.
@@ -228,14 +229,17 @@ impl Slider {
         match self.config.slider_type {
             SliderType::MinContrast => Some(Msg::MinContrastChanged(self.value)),
             SliderType::ExtendedMinContrast => Some(Msg::ExtendedMinContrastChanged(self.value)),
-            SliderType::MaxLightnessAdjustment => {
-                Some(Msg::MaxLightnessAdjustmentChanged(self.value as f32))
+            SliderType::AccentColorfulness => {
+                Some(Msg::AccentColorfulnessChanged(self.value as f32))
             }
-            SliderType::AccentChroma => Some(Msg::AccentChromaChanged(self.value as f32)),
-            SliderType::ExtendedChroma => Some(Msg::ExtendedChromaChanged(self.value as f32)),
+            SliderType::ExtendedColorfulness => {
+                Some(Msg::ExtendedColorfulnessChanged(self.value as f32))
+            }
             SliderType::LightnessStrength => {
                 Some(Msg::LightnessCurveStrengthChanged(self.value as f32))
             }
+            SliderType::ChromaStrength => Some(Msg::ChromaCurveStrengthChanged(self.value as f32)),
+            SliderType::HueStrength => Some(Msg::HueCurveStrengthChanged(self.value as f32)),
         }
     }
 }

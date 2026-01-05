@@ -1,4 +1,4 @@
-//! OKLCH color picker Component with L/C/H sliders.
+//! HellwigJmh color picker Component with J/M/h sliders.
 
 use crossterm_actions::{AppEvent, NavigationEvent, SelectionEvent, TuiEvent};
 use palette::Srgb;
@@ -15,23 +15,24 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
+use crate::hellwig::HellwigJmh;
 use crate::tui::event::{UserEvent, dispatcher};
 use crate::tui::msg::Msg;
 
 /// Which slider is focused within the picker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OklchFocus {
+pub enum HellwigFocus {
     #[default]
     Lightness,
-    Chroma,
+    Colorfulness,
     Hue,
 }
 
-impl OklchFocus {
+impl HellwigFocus {
     fn next(self) -> Self {
         match self {
-            Self::Lightness => Self::Chroma,
-            Self::Chroma => Self::Hue,
+            Self::Lightness => Self::Colorfulness,
+            Self::Colorfulness => Self::Hue,
             Self::Hue => Self::Lightness,
         }
     }
@@ -39,76 +40,84 @@ impl OklchFocus {
     fn prev(self) -> Self {
         match self {
             Self::Lightness => Self::Hue,
-            Self::Chroma => Self::Lightness,
-            Self::Hue => Self::Chroma,
+            Self::Colorfulness => Self::Lightness,
+            Self::Hue => Self::Colorfulness,
         }
     }
 }
 
-/// OKLCH color values.
+/// HellwigJmh color values.
 #[derive(Debug, Clone, Copy)]
-pub struct OklchValues {
+pub struct HellwigValues {
+    /// Lightness (J'), range 0-100
     pub lightness: f32,
-    pub chroma: f32,
+    /// Colorfulness (M), range 0-105
+    pub colorfulness: f32,
+    /// Hue (h), range 0-360 degrees
     pub hue: f32,
+    /// Whether the color is out of sRGB gamut
     pub out_of_gamut: bool,
 }
 
-impl Default for OklchValues {
+impl Default for HellwigValues {
     fn default() -> Self {
         Self {
-            lightness: 0.5,
-            chroma: 0.0,
+            lightness: 50.0,
+            colorfulness: 0.0,
             hue: 0.0,
             out_of_gamut: false,
         }
     }
 }
 
-/// Type of OKLCH picker (background or foreground).
+/// Type of Hellwig picker (background or foreground).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OklchPickerType {
+pub enum HellwigPickerType {
     Background,
     Foreground,
 }
 
-/// OKLCH color picker with L, C, H sliders grouped together.
-pub struct OklchPicker {
+/// HellwigJmh color picker with J, M, h sliders grouped together.
+pub struct HellwigPicker {
     props: Props,
-    picker_type: OklchPickerType,
-    values: OklchValues,
+    picker_type: HellwigPickerType,
+    values: HellwigValues,
     srgb_preview: Srgb<u8>,
-    sub_focus: OklchFocus,
+    sub_focus: HellwigFocus,
 }
 
-impl OklchPicker {
-    pub fn new(picker_type: OklchPickerType, values: OklchValues, srgb: Srgb<u8>) -> Self {
+impl HellwigPicker {
+    pub fn new(picker_type: HellwigPickerType, values: HellwigValues, srgb: Srgb<u8>) -> Self {
         Self {
             props: Props::default(),
             picker_type,
             values,
             srgb_preview: srgb,
-            sub_focus: OklchFocus::Lightness,
+            sub_focus: HellwigFocus::Lightness,
         }
     }
 
     fn label(&self) -> &'static str {
         match self.picker_type {
-            OklchPickerType::Background => "Background",
-            OklchPickerType::Foreground => "Foreground",
+            HellwigPickerType::Background => "Background",
+            HellwigPickerType::Foreground => "Foreground",
         }
     }
 
     fn adjust_current(&mut self, delta: f64) {
         match self.sub_focus {
-            OklchFocus::Lightness => {
+            HellwigFocus::Lightness => {
+                // Increment of 1.0 per keystroke (0-100 range)
                 self.values.lightness =
-                    (self.values.lightness + delta as f32 * 0.01).clamp(0.0, 1.0);
+                    (self.values.lightness + delta as f32 * 1.0).clamp(0.0, 100.0);
             }
-            OklchFocus::Chroma => {
-                self.values.chroma = (self.values.chroma + delta as f32 * 0.01).clamp(0.0, 0.4);
+            HellwigFocus::Colorfulness => {
+                // Increment of 1.0 per keystroke (0-105 range)
+                self.values.colorfulness =
+                    (self.values.colorfulness + delta as f32 * 1.0).clamp(0.0, 105.0);
             }
-            OklchFocus::Hue => {
+            HellwigFocus::Hue => {
+                // Increment of 1.0 degree per keystroke
                 self.values.hue = (self.values.hue + delta as f32).rem_euclid(360.0);
             }
         }
@@ -116,12 +125,14 @@ impl OklchPicker {
         self.update_derived();
     }
 
-    /// Update derived values (out_of_gamut flag and sRGB preview) from current OKLCH.
+    /// Update derived values (out_of_gamut flag and sRGB preview) from current HellwigJmh.
     fn update_derived(&mut self) {
-        use palette::{IntoColor, Oklch};
-        let oklch = Oklch::new(self.values.lightness, self.values.chroma, self.values.hue);
-        let linear: palette::LinSrgb<f32> = oklch.into_color();
-        let srgb: palette::Srgb<f32> = Srgb::from_linear(linear);
+        let hellwig = HellwigJmh::new(
+            self.values.lightness,
+            self.values.colorfulness,
+            self.values.hue,
+        );
+        let srgb = hellwig.into_srgb();
 
         // Check gamut
         self.values.out_of_gamut = srgb.red < 0.0
@@ -196,8 +207,12 @@ impl OklchPicker {
             }
         }
 
+        // Format value - show integer for J and M, degrees for H
         let value_str = if show_degrees {
             format!(" {:.0}°", value)
+        } else if max > 10.0 {
+            // For J (0-100) and M (0-105), show as integer
+            format!(" {:.0}", value)
         } else {
             format!(" {:.2}", value)
         };
@@ -215,14 +230,14 @@ impl OklchPicker {
     }
 }
 
-impl MockComponent for OklchPicker {
+impl MockComponent for HellwigPicker {
     fn view(&mut self, frame: &mut Frame, area: Rect) {
         let focused = self
             .props
             .get_or(Attribute::Focus, AttrValue::Flag(false))
             .unwrap_flag();
 
-        // Split into 3 rows for L, C, H
+        // Split into 3 rows for J, M, h
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -234,27 +249,27 @@ impl MockComponent for OklchPicker {
 
         let warning = if self.values.out_of_gamut { " !" } else { "" };
 
-        // Lightness
+        // Lightness (J')
         self.draw_slider(
             frame,
             rows[0],
-            &format!("{} L{}", self.label(), warning),
+            &format!("{} J{}", self.label(), warning),
             self.values.lightness,
             0.0,
-            1.0,
-            focused && self.sub_focus == OklchFocus::Lightness,
+            100.0,
+            focused && self.sub_focus == HellwigFocus::Lightness,
             false,
         );
 
-        // Chroma
+        // Colorfulness (M)
         self.draw_slider(
             frame,
             rows[1],
-            "  C",
-            self.values.chroma,
+            "  M",
+            self.values.colorfulness,
             0.0,
-            0.4,
-            focused && self.sub_focus == OklchFocus::Chroma,
+            105.0,
+            focused && self.sub_focus == HellwigFocus::Colorfulness,
             false,
         );
 
@@ -267,11 +282,11 @@ impl MockComponent for OklchPicker {
         self.draw_slider(
             frame,
             hue_cols[0],
-            "  H",
+            "  h",
             self.values.hue,
             0.0,
             360.0,
-            focused && self.sub_focus == OklchFocus::Hue,
+            focused && self.sub_focus == HellwigFocus::Hue,
             true,
         );
 
@@ -294,10 +309,10 @@ impl MockComponent for OklchPicker {
     }
 
     fn state(&self) -> State {
-        // Return L, C, H as a tuple-like state
+        // Return J, M, h as a tuple-like state
         State::Tup3((
             StateValue::F64(self.values.lightness as f64),
-            StateValue::F64(self.values.chroma as f64),
+            StateValue::F64(self.values.colorfulness as f64),
             StateValue::F64(self.values.hue as f64),
         ))
     }
@@ -325,7 +340,7 @@ impl MockComponent for OklchPicker {
     }
 }
 
-impl Component<Msg, UserEvent> for OklchPicker {
+impl Component<Msg, UserEvent> for HellwigPicker {
     fn on(&mut self, ev: Event<UserEvent>) -> Option<Msg> {
         let focused = self
             .props
@@ -383,18 +398,22 @@ impl Component<Msg, UserEvent> for OklchPicker {
     }
 }
 
-impl OklchPicker {
+impl HellwigPicker {
     fn msg_for_change(&self) -> Option<Msg> {
         match self.picker_type {
-            OklchPickerType::Background => match self.sub_focus {
-                OklchFocus::Lightness => Some(Msg::BackgroundLChanged(self.values.lightness)),
-                OklchFocus::Chroma => Some(Msg::BackgroundCChanged(self.values.chroma)),
-                OklchFocus::Hue => Some(Msg::BackgroundHChanged(self.values.hue)),
+            HellwigPickerType::Background => match self.sub_focus {
+                HellwigFocus::Lightness => Some(Msg::BackgroundJChanged(self.values.lightness)),
+                HellwigFocus::Colorfulness => {
+                    Some(Msg::BackgroundMChanged(self.values.colorfulness))
+                }
+                HellwigFocus::Hue => Some(Msg::BackgroundHChanged(self.values.hue)),
             },
-            OklchPickerType::Foreground => match self.sub_focus {
-                OklchFocus::Lightness => Some(Msg::ForegroundLChanged(self.values.lightness)),
-                OklchFocus::Chroma => Some(Msg::ForegroundCChanged(self.values.chroma)),
-                OklchFocus::Hue => Some(Msg::ForegroundHChanged(self.values.hue)),
+            HellwigPickerType::Foreground => match self.sub_focus {
+                HellwigFocus::Lightness => Some(Msg::ForegroundJChanged(self.values.lightness)),
+                HellwigFocus::Colorfulness => {
+                    Some(Msg::ForegroundMChanged(self.values.colorfulness))
+                }
+                HellwigFocus::Hue => Some(Msg::ForegroundHChanged(self.values.hue)),
             },
         }
     }

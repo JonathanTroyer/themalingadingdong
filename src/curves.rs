@@ -94,7 +94,7 @@ impl Default for CurveConfig {
 }
 
 /// Complete interpolation configuration with separate curves for L/C/H.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct InterpolationConfig {
     /// Curve for lightness interpolation
@@ -103,6 +103,19 @@ pub struct InterpolationConfig {
     pub chroma: CurveConfig,
     /// Curve for hue interpolation
     pub hue: CurveConfig,
+}
+
+impl Default for InterpolationConfig {
+    fn default() -> Self {
+        Self {
+            lightness: CurveConfig {
+                curve_type: CurveType::Smoothstep,
+                ..Default::default()
+            },
+            chroma: CurveConfig::default(),
+            hue: CurveConfig::default(),
+        }
+    }
 }
 
 /// Evaluate a curve at parameter t (0.0 to 1.0).

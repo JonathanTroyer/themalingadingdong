@@ -130,27 +130,33 @@ fn run_loop(
             let params_inner = params_block.inner(params_area);
             frame.render_widget(params_block, params_area);
 
-            // Determine if strength slider should be shown
-            let show_strength = model.interpolation.lightness.curve_type.uses_strength();
-            let strength_height = if show_strength { 1 } else { 0 };
+            // Determine if strength sliders should be shown
+            let show_j_strength = model.interpolation.lightness.curve_type.uses_strength();
+            let show_m_strength = model.interpolation.chroma.curve_type.uses_strength();
+            let show_h_strength = model.interpolation.hue.curve_type.uses_strength();
+            let j_strength_height = if show_j_strength { 1 } else { 0 };
+            let m_strength_height = if show_m_strength { 1 } else { 0 };
+            let h_strength_height = if show_h_strength { 1 } else { 0 };
 
             let param_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3),               // Background picker (L/C/H)
-                    Constraint::Length(3),               // Foreground picker (L/C/H)
-                    Constraint::Length(1),               // Spacer
-                    Constraint::Length(1),               // Lightness curve
-                    Constraint::Length(strength_height), // Lightness strength (only for sigmoid)
-                    Constraint::Length(1),               // Chroma curve
-                    Constraint::Length(1),               // Hue curve
-                    Constraint::Length(1),               // Spacer
-                    Constraint::Length(1),               // Target contrast
-                    Constraint::Length(1),               // Extended contrast
-                    Constraint::Length(1),               // Accent chroma
-                    Constraint::Length(1),               // Extended chroma
-                    Constraint::Length(1),               // Spacer
-                    Constraint::Length(3),               // Hue overrides
+                    Constraint::Length(3),                 // Background picker (J/M/h)
+                    Constraint::Length(3),                 // Foreground picker (J/M/h)
+                    Constraint::Length(1),                 // Spacer
+                    Constraint::Length(1),                 // Lightness curve
+                    Constraint::Length(j_strength_height), // Lightness strength (only for sigmoid)
+                    Constraint::Length(1),                 // Chroma curve
+                    Constraint::Length(m_strength_height), // Chroma strength (only for sigmoid)
+                    Constraint::Length(1),                 // Hue curve
+                    Constraint::Length(h_strength_height), // Hue strength (only for sigmoid)
+                    Constraint::Length(1),                 // Spacer
+                    Constraint::Length(1),                 // Target contrast
+                    Constraint::Length(1),                 // Extended contrast
+                    Constraint::Length(1),                 // Accent colorfulness
+                    Constraint::Length(1),                 // Extended colorfulness
+                    Constraint::Length(1),                 // Spacer
+                    Constraint::Length(3),                 // Hue overrides
                     Constraint::Min(0),
                 ])
                 .split(params_inner);
@@ -158,16 +164,22 @@ fn run_loop(
             app.view(&Id::BackgroundPicker, frame, param_rows[0]);
             app.view(&Id::ForegroundPicker, frame, param_rows[1]);
             app.view(&Id::LightnessCurve, frame, param_rows[3]);
-            if show_strength {
+            if show_j_strength {
                 app.view(&Id::LightnessStrength, frame, param_rows[4]);
             }
             app.view(&Id::ChromaCurve, frame, param_rows[5]);
-            app.view(&Id::HueCurve, frame, param_rows[6]);
-            app.view(&Id::TargetContrast, frame, param_rows[8]);
-            app.view(&Id::ExtendedContrast, frame, param_rows[9]);
-            app.view(&Id::AccentChroma, frame, param_rows[10]);
-            app.view(&Id::ExtendedChroma, frame, param_rows[11]);
-            app.view(&Id::HueOverrides, frame, param_rows[13]);
+            if show_m_strength {
+                app.view(&Id::ChromaStrength, frame, param_rows[6]);
+            }
+            app.view(&Id::HueCurve, frame, param_rows[7]);
+            if show_h_strength {
+                app.view(&Id::HueStrength, frame, param_rows[8]);
+            }
+            app.view(&Id::TargetContrast, frame, param_rows[10]);
+            app.view(&Id::ExtendedContrast, frame, param_rows[11]);
+            app.view(&Id::AccentColorfulness, frame, param_rows[12]);
+            app.view(&Id::ExtendedColorfulness, frame, param_rows[13]);
+            app.view(&Id::HueOverrides, frame, param_rows[15]);
 
             // Validation panel
             app.view(&Id::Validation, frame, right_rows[1]);
@@ -263,7 +275,7 @@ fn sync_display_components(
     );
     let _ = app.mount(Id::Validation, Box::new(validation), vec![]);
 
-    // NOTE: We intentionally do NOT remount interactive components (OklchPicker, sliders, etc.)
+    // NOTE: We intentionally do NOT remount interactive components (HellwigPicker, sliders, etc.)
     // to preserve their internal state (sub_focus, etc.). The display updates via regenerate()
     // and pickers read their own values which stay in sync.
 }

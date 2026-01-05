@@ -85,10 +85,12 @@ pub struct ColorConfig {
     pub background: Option<String>,
     /// Foreground color (any CSS color format)
     pub foreground: Option<String>,
-    /// Chroma for accent colors (0.0-0.4)
-    pub accent_chroma: Option<f32>,
-    /// Chroma for extended accent colors (0.0-0.4)
-    pub extended_chroma: Option<f32>,
+    /// Colorfulness for accent colors (HellwigJmh M, 0-50 typical)
+    #[serde(alias = "accent_chroma")]
+    pub accent_colorfulness: Option<f32>,
+    /// Colorfulness for extended accent colors (HellwigJmh M, 0-50 typical)
+    #[serde(alias = "extended_chroma")]
+    pub extended_colorfulness: Option<f32>,
     /// Hue overrides for accent colors
     pub hue_overrides: Option<HueOverrides>,
 }
@@ -156,7 +158,7 @@ pub struct ContrastConfig {
     /// Minimum APCA contrast for extended accent colors (Lc value)
     #[serde(alias = "extended")]
     pub extended_minimum: f64,
-    /// Maximum per-hue lightness adjustment allowed (0.0-0.1, default 0.02).
+    /// Maximum per-hue lightness adjustment allowed (0-10 J' units, default 2.0).
     /// Small adjustments help difficult hues reach minimum contrast while
     /// keeping colors near-uniform.
     pub max_adjustment: f32,
@@ -167,7 +169,7 @@ impl Default for ContrastConfig {
         Self {
             minimum: 75.0,
             extended_minimum: 60.0,
-            max_adjustment: 0.02,
+            max_adjustment: 2.0,
         }
     }
 }
@@ -219,11 +221,14 @@ impl ThemeConfig {
             min_contrast: self.contrast.minimum,
             extended_min_contrast: self.contrast.extended_minimum,
             max_lightness_adjustment: self.contrast.max_adjustment,
-            accent_chroma: self.colors.accent_chroma.unwrap_or(defaults.accent_chroma),
-            extended_chroma: self
+            accent_colorfulness: self
                 .colors
-                .extended_chroma
-                .unwrap_or(defaults.extended_chroma),
+                .accent_colorfulness
+                .unwrap_or(defaults.accent_colorfulness),
+            extended_colorfulness: self
+                .colors
+                .extended_colorfulness
+                .unwrap_or(defaults.extended_colorfulness),
             name: if self.theme.name.is_empty() {
                 defaults.name
             } else {
@@ -251,8 +256,8 @@ impl ThemeConfig {
                     "#{:02x}{:02x}{:02x}",
                     config.foreground.red, config.foreground.green, config.foreground.blue
                 )),
-                accent_chroma: Some(config.accent_chroma),
-                extended_chroma: Some(config.extended_chroma),
+                accent_colorfulness: Some(config.accent_colorfulness),
+                extended_colorfulness: Some(config.extended_colorfulness),
                 hue_overrides: Some(HueOverrides::from_array(config.hue_overrides)),
             },
             curves: config.interpolation.clone(),

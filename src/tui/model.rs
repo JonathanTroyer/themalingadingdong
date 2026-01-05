@@ -10,62 +10,50 @@ use tuirealm::Update;
 use crate::cli::{Cli, VariantArg};
 use crate::curves::InterpolationConfig;
 use crate::generate::{GenerateConfig, generate_for_variant, parse_color};
-use crate::interpolation::srgb_to_oklch;
-use crate::validation::{ValidationResult, validate};
+use crate::hellwig::HellwigJmh;
+use crate::validation::{ValidationResults, validate};
 
 use super::msg::Msg;
 
-/// OKLCH color components for editing.
+/// HellwigJmh color components for editing.
 #[derive(Debug, Clone, Copy)]
-pub struct OklchComponents {
+pub struct HellwigComponents {
+    /// Lightness with HK effect (J'), range 0-100
     pub lightness: f32,
-    pub chroma: f32,
+    /// Colorfulness (M), range 0-105
+    pub colorfulness: f32,
+    /// Hue angle in degrees (0-360)
     pub hue: f32,
+    /// Whether the color is out of sRGB gamut
     pub out_of_gamut: bool,
 }
 
-impl OklchComponents {
+impl HellwigComponents {
     pub fn from_srgb(color: Srgb<u8>) -> Self {
-        let (l, c, h) = srgb_to_oklch(color);
+        let hellwig = HellwigJmh::from_srgb_u8(color);
         Self {
-            lightness: l,
-            chroma: c,
-            hue: h,
+            lightness: hellwig.lightness,
+            colorfulness: hellwig.colorfulness,
+            hue: hellwig.hue,
             out_of_gamut: false,
         }
     }
 
     pub fn to_srgb(self) -> Srgb<u8> {
-        use palette::{IntoColor, Oklch};
-        let oklch = Oklch::new(self.lightness, self.chroma, self.hue);
-        let linear: palette::LinSrgb<f32> = oklch.into_color();
-        let srgb: palette::Srgb<f32> = palette::Srgb::from_linear(linear);
-        Srgb::new(
-            (srgb.red.clamp(0.0, 1.0) * 255.0).round() as u8,
-            (srgb.green.clamp(0.0, 1.0) * 255.0).round() as u8,
-            (srgb.blue.clamp(0.0, 1.0) * 255.0).round() as u8,
-        )
+        HellwigJmh::new(self.lightness, self.colorfulness, self.hue).into_srgb_u8()
     }
 
     pub fn check_gamut(&mut self) {
-        use palette::{IntoColor, Oklch};
-        let oklch = Oklch::new(self.lightness, self.chroma, self.hue);
-        let linear: palette::LinSrgb<f32> = oklch.into_color();
-        let srgb: palette::Srgb<f32> = palette::Srgb::from_linear(linear);
-        self.out_of_gamut = srgb.red < 0.0
-            || srgb.red > 1.0
-            || srgb.green < 0.0
-            || srgb.green > 1.0
-            || srgb.blue < 0.0
-            || srgb.blue > 1.0;
+        let hellwig = HellwigJmh::new(self.lightness, self.colorfulness, self.hue);
+        self.out_of_gamut = !hellwig.is_in_gamut();
     }
 }
 
-impl Default for OklchComponents {
+impl Default for HellwigComponents {
     fn default() -> Self {
         Self {
-            lightness: 0.5,
-            chroma: 0.0,
+            lightness: 50.0,
+            colorfulness: 0.0,
             hue: 0.0,
             out_of_gamut: false,
         }
@@ -75,13 +63,13 @@ impl Default for OklchComponents {
 /// Application model containing all state.
 pub struct Model {
     // Editable parameters
-    pub background_oklch: OklchComponents,
-    pub foreground_oklch: OklchComponents,
+    pub background_hellwig: HellwigComponents,
+    pub foreground_hellwig: HellwigComponents,
     pub min_contrast: f64,
     pub extended_min_contrast: f64,
     pub max_lightness_adjustment: f32,
-    pub accent_chroma: f32,
-    pub extended_chroma: f32,
+    pub accent_colorfulness: f32,
+    pub extended_colorfulness: f32,
     pub hue_overrides: [Option<f32>; 8],
     pub variant: VariantArg,
     pub name: String,
@@ -95,7 +83,7 @@ pub struct Model {
     // Generated output
     pub current_scheme: Option<Base16Scheme>,
     pub generation_warnings: Vec<String>,
-    pub validation_results: Vec<ValidationResult>,
+    pub validation_results: Option<ValidationResults>,
 
     // UI state
     pub quit: bool,
@@ -121,17 +109,17 @@ impl Model {
         let foreground = parse_color(&fg_str)
             .map_err(|e| color_eyre::eyre::eyre!("Invalid foreground color: {}", e))?;
 
-        let background_oklch = OklchComponents::from_srgb(background);
-        let foreground_oklch = OklchComponents::from_srgb(foreground);
+        let background_hellwig = HellwigComponents::from_srgb(background);
+        let foreground_hellwig = HellwigComponents::from_srgb(foreground);
 
         Ok(Self {
-            background_oklch,
-            foreground_oklch,
+            background_hellwig,
+            foreground_hellwig,
             min_contrast: cli.min_contrast,
             extended_min_contrast: cli.extended_min_contrast,
             max_lightness_adjustment: cli.max_lightness_adjustment,
-            accent_chroma: cli.accent_chroma,
-            extended_chroma: cli.extended_chroma,
+            accent_colorfulness: cli.accent_colorfulness,
+            extended_colorfulness: cli.extended_colorfulness,
             hue_overrides: cli.hue_overrides(),
             variant: cli.variant,
             name,
@@ -143,7 +131,7 @@ impl Model {
 
             current_scheme: None,
             generation_warnings: Vec::new(),
-            validation_results: Vec::new(),
+            validation_results: None,
 
             quit: false,
             message: None,
@@ -160,8 +148,8 @@ impl Model {
             min_contrast: self.min_contrast,
             extended_min_contrast: self.extended_min_contrast,
             max_lightness_adjustment: self.max_lightness_adjustment,
-            accent_chroma: self.accent_chroma,
-            extended_chroma: self.extended_chroma,
+            accent_colorfulness: self.accent_colorfulness,
+            extended_colorfulness: self.extended_colorfulness,
             name: self.name.clone(),
             author: if self.author.is_empty() {
                 None
@@ -174,13 +162,13 @@ impl Model {
 
     /// Regenerate the palette from current state.
     pub fn regenerate(&mut self) {
-        // Recompute sRGB from OKLCH
-        self.background = self.background_oklch.to_srgb();
-        self.foreground = self.foreground_oklch.to_srgb();
+        // Recompute sRGB from HellwigJmh
+        self.background = self.background_hellwig.to_srgb();
+        self.foreground = self.foreground_hellwig.to_srgb();
 
         // Check gamut
-        self.background_oklch.check_gamut();
-        self.foreground_oklch.check_gamut();
+        self.background_hellwig.check_gamut();
+        self.foreground_hellwig.check_gamut();
 
         let config = self.to_generate_config();
         let forced = match self.variant {
@@ -191,7 +179,7 @@ impl Model {
         };
 
         let result = generate_for_variant(&config, forced);
-        self.validation_results = validate(&result.scheme);
+        self.validation_results = Some(validate(&result.scheme));
         self.generation_warnings = result.warnings;
         self.current_scheme = Some(result.scheme);
         self.message = None;
@@ -224,31 +212,31 @@ impl Update<Msg> for Model {
                 None
             }
 
-            // Background changes
-            Msg::BackgroundLChanged(v) => {
-                self.background_oklch.lightness = v;
+            // Background changes (HellwigJmh J', M, h)
+            Msg::BackgroundJChanged(v) => {
+                self.background_hellwig.lightness = v;
                 Some(Msg::Regenerate)
             }
-            Msg::BackgroundCChanged(v) => {
-                self.background_oklch.chroma = v;
+            Msg::BackgroundMChanged(v) => {
+                self.background_hellwig.colorfulness = v;
                 Some(Msg::Regenerate)
             }
             Msg::BackgroundHChanged(v) => {
-                self.background_oklch.hue = v;
+                self.background_hellwig.hue = v;
                 Some(Msg::Regenerate)
             }
 
-            // Foreground changes
-            Msg::ForegroundLChanged(v) => {
-                self.foreground_oklch.lightness = v;
+            // Foreground changes (HellwigJmh J', M, h)
+            Msg::ForegroundJChanged(v) => {
+                self.foreground_hellwig.lightness = v;
                 Some(Msg::Regenerate)
             }
-            Msg::ForegroundCChanged(v) => {
-                self.foreground_oklch.chroma = v;
+            Msg::ForegroundMChanged(v) => {
+                self.foreground_hellwig.colorfulness = v;
                 Some(Msg::Regenerate)
             }
             Msg::ForegroundHChanged(v) => {
-                self.foreground_oklch.hue = v;
+                self.foreground_hellwig.hue = v;
                 Some(Msg::Regenerate)
             }
 
@@ -261,16 +249,12 @@ impl Update<Msg> for Model {
                 self.extended_min_contrast = v;
                 Some(Msg::Regenerate)
             }
-            Msg::MaxLightnessAdjustmentChanged(v) => {
-                self.max_lightness_adjustment = v;
+            Msg::AccentColorfulnessChanged(v) => {
+                self.accent_colorfulness = v;
                 Some(Msg::Regenerate)
             }
-            Msg::AccentChromaChanged(v) => {
-                self.accent_chroma = v;
-                Some(Msg::Regenerate)
-            }
-            Msg::ExtendedChromaChanged(v) => {
-                self.extended_chroma = v;
+            Msg::ExtendedColorfulnessChanged(v) => {
+                self.extended_colorfulness = v;
                 Some(Msg::Regenerate)
             }
 
@@ -291,8 +275,16 @@ impl Update<Msg> for Model {
                 self.interpolation.chroma.curve_type = v;
                 Some(Msg::Regenerate)
             }
+            Msg::ChromaCurveStrengthChanged(v) => {
+                self.interpolation.chroma.strength = v;
+                Some(Msg::Regenerate)
+            }
             Msg::HueCurveTypeChanged(v) => {
                 self.interpolation.hue.curve_type = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::HueCurveStrengthChanged(v) => {
+                self.interpolation.hue.strength = v;
                 Some(Msg::Regenerate)
             }
 

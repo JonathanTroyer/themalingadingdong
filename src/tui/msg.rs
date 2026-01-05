@@ -19,29 +19,30 @@ pub enum Msg {
     FocusUp,
     FocusDown,
 
-    // Background OKLCH changes
-    BackgroundLChanged(f32),
-    BackgroundCChanged(f32),
+    // Background HellwigJmh changes (J', M, h)
+    BackgroundJChanged(f32),
+    BackgroundMChanged(f32),
     BackgroundHChanged(f32),
 
-    // Foreground OKLCH changes
-    ForegroundLChanged(f32),
-    ForegroundCChanged(f32),
+    // Foreground HellwigJmh changes (J', M, h)
+    ForegroundJChanged(f32),
+    ForegroundMChanged(f32),
     ForegroundHChanged(f32),
 
     // Numeric parameter changes
     MinContrastChanged(f64),
     ExtendedMinContrastChanged(f64),
-    MaxLightnessAdjustmentChanged(f32),
-    AccentChromaChanged(f32),
-    ExtendedChromaChanged(f32),
+    AccentColorfulnessChanged(f32),
+    ExtendedColorfulnessChanged(f32),
 
     // Selection changes
     VariantChanged(VariantArg),
     LightnessCurveTypeChanged(CurveType),
     LightnessCurveStrengthChanged(f32),
     ChromaCurveTypeChanged(CurveType),
+    ChromaCurveStrengthChanged(f32),
     HueCurveTypeChanged(CurveType),
+    HueCurveStrengthChanged(f32),
 
     // Hue override changes (index 0-7)
     HueOverrideChanged(u8, Option<f32>),
