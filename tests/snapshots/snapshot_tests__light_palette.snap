@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Light Palette
+variant: Light
+base00: "#f0f0f0"
+base01: "#e7e6e6"
+base02: "#cdcdcd"
+base03: "#a9a8a8"
+base04: "#7e7e7e"
+base05: "#535353"
+base06: "#2f3030"
+base07: "#202020"
+base08: "#ffbcb4"
+base09: "#fec299"
+base0a: "#eccf89"
+base0b: "#b1dda7"
+base0c: "#9adbca"
+base0d: "#a3d0ff"
+base0e: "#c7c6fc"
+base0f: "#f6b6ea"
+base10: "#ff978c"
+base11: "#f3a76e"
+base12: "#dcb756"
+base13: "#89cb81"
+base14: "#5fc9b3"
+base15: "#70baff"
+base16: "#abacfa"
+base17: "#eb94df"

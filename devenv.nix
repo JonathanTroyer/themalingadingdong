@@ -9,6 +9,7 @@
     treefmt
     cargo-nextest
     cargo-tarpaulin
+    cargo-insta
   ];
 
   languages = {

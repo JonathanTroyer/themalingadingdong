@@ -1,11 +1,13 @@
 //! Parameter editing components.
 
+mod accent_controls;
+mod curve_controls;
 mod hellwig_picker;
 mod hue_grid;
-mod selector;
-mod slider;
+mod weight_controls;
 
+pub use accent_controls::{AccentControls, AccentControlsType, AccentValues};
+pub use curve_controls::{CurveControls, CurveValues};
 pub use hellwig_picker::{HellwigPicker, HellwigPickerType, HellwigValues};
 pub use hue_grid::HueGrid;
-pub use selector::{CycleSelector, SelectorType};
-pub use slider::{Slider, SliderConfig, SliderType};
+pub use weight_controls::{WeightControls, WeightValues};

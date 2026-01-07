@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Solarized Dark Like
+variant: Dark
+base00: "#002b36"
+base01: "#0f323c"
+base02: "#26444c"
+base03: "#3f5960"
+base04: "#576f74"
+base05: "#6c8286"
+base06: "#7c8f92"
+base07: "#839496"
+base08: "#ffbfb7"
+base09: "#ffc49b"
+base0a: "#edd08b"
+base0b: "#b2dea8"
+base0c: "#9cdccb"
+base0d: "#a7d1ff"
+base0e: "#c9c8fc"
+base0f: "#f6b8ea"
+base10: "#ff9a8e"
+base11: "#f4a870"
+base12: "#ddb857"
+base13: "#8bcd82"
+base14: "#60cab4"
+base15: "#73bbff"
+base16: "#acadfa"
+base17: "#eb95df"

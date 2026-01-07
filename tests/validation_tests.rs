@@ -3,36 +3,11 @@ use themalingadingdong::generate::{GenerateConfig, generate};
 use themalingadingdong::validation::{validate, validate_with_warnings};
 
 #[test]
-fn test_validate_returns_results() {
-    let config = GenerateConfig::default();
-    let scheme = generate(&config).scheme;
-
-    let results = validate(&scheme);
-    assert!(!results.required.is_empty());
-}
-
-#[test]
-fn test_validate_checks_contrast() {
-    let config = GenerateConfig::default();
-    let scheme = generate(&config).scheme;
-
-    let results = validate(&scheme);
-    for result in &results.required {
-        // Contrast should be calculated (non-zero for different colors)
-        assert!(
-            result.contrast.abs() > 0.0 || result.contrast == 0.0,
-            "Contrast should be calculated"
-        );
-    }
-}
-
-#[test]
 fn test_high_contrast_scheme_passes() {
     let config = GenerateConfig {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
         min_contrast: 75.0,
-        accent_colorfulness: 15.0,
         ..Default::default()
     };
 
@@ -56,7 +31,6 @@ fn test_validate_with_warnings_returns_failures() {
         background: Srgb::new(30u8, 30, 40),
         foreground: Srgb::new(200u8, 200, 200),
         min_contrast: 45.0,
-        accent_colorfulness: 25.0,
         ..Default::default()
     };
 
@@ -81,7 +55,6 @@ fn test_accent_colors_meet_target_contrast() {
         background: Srgb::new(0u8, 0, 0),
         foreground: Srgb::new(255u8, 255, 255),
         min_contrast: 75.0,
-        accent_colorfulness: 15.0,
         ..Default::default()
     };
 

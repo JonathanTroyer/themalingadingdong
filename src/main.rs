@@ -5,9 +5,12 @@ use std::path::Path;
 use clap::Parser;
 use color_eyre::eyre::{Result, WrapErr, bail, eyre};
 use tinted_builder::SchemeVariant;
+use tracing::{info, warn};
 
 use themalingadingdong::cli::{Cli, VariantArg};
-use themalingadingdong::generate::{GenerateConfig, generate_for_variant, parse_color};
+use themalingadingdong::config::{load_config, validate_config};
+use themalingadingdong::generate::generate_for_variant;
+use themalingadingdong::logging::init_logging;
 use themalingadingdong::tui;
 use themalingadingdong::validation::validate_with_warnings;
 
@@ -16,45 +19,33 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Launch TUI if --interactive flag is set
+    let _log_guard = init_logging(cli.log_file.as_deref(), Some(&cli.log_level));
+
+    info!(version = env!("CARGO_PKG_VERSION"), "started");
+
     if cli.interactive {
         return tui::run(&cli);
     }
 
-    // Parse input colors (required in non-interactive mode)
-    let bg_str = cli
-        .background
-        .as_ref()
-        .ok_or_else(|| eyre!("Background color is required"))?;
-    let fg_str = cli
-        .foreground
-        .as_ref()
-        .ok_or_else(|| eyre!("Foreground color is required"))?;
-    let name_str = cli
-        .name
-        .as_ref()
-        .ok_or_else(|| eyre!("Scheme name is required"))?;
+    // Load configuration with Figment layering: defaults < TOML file < CLI args
+    let theme_config = load_config(cli.config.as_deref(), &cli.to_config_overrides())
+        .map_err(|e| eyre!("Configuration error: {}", e))?;
 
-    let background =
-        parse_color(bg_str).map_err(|e| eyre!("Invalid background color '{}': {}", bg_str, e))?;
+    // Validate required fields
+    validate_config(&theme_config).map_err(|e| eyre!("{}", e))?;
 
-    let foreground =
-        parse_color(fg_str).map_err(|e| eyre!("Invalid foreground color '{}': {}", fg_str, e))?;
+    // Handle --save-config if specified
+    if let Some(ref save_path) = cli.save_config {
+        theme_config
+            .save(save_path)
+            .map_err(|e| eyre!("Failed to save config: {}", e))?;
+        eprintln!("Saved configuration to {}", save_path.display());
+    }
 
-    // Create generation config
-    let config = GenerateConfig {
-        background,
-        foreground,
-        hue_overrides: cli.hue_overrides(),
-        min_contrast: cli.min_contrast,
-        extended_min_contrast: cli.extended_min_contrast,
-        max_lightness_adjustment: cli.max_lightness_adjustment,
-        accent_colorfulness: cli.accent_colorfulness,
-        extended_colorfulness: cli.extended_colorfulness,
-        name: name_str.clone(),
-        author: cli.author.clone(),
-        interpolation: cli.interpolation_config(),
-    };
+    // Convert to GenerateConfig
+    let config = theme_config
+        .to_generate_config()
+        .map_err(|e| eyre!("Invalid configuration: {}", e))?;
 
     // Determine which variants to generate
     let variants_to_generate: Vec<Option<SchemeVariant>> = match cli.variant {
@@ -70,37 +61,35 @@ fn main() -> Result<()> {
     };
 
     for forced_variant in variants_to_generate {
-        // Generate the scheme
         let result = generate_for_variant(&config, forced_variant);
         let scheme = result.scheme;
 
-        // Display generation warnings (hues that couldn't achieve target contrast)
         if !result.warnings.is_empty() {
             eprintln!("Generation warnings:");
             for warning in &result.warnings {
+                warn!(warning = %warning, "generation warning");
                 eprintln!("  {warning}");
             }
         }
 
-        // Validate
         let warnings = validate_with_warnings(&scheme);
         if !warnings.is_empty() {
             if cli.no_adjust {
                 eprintln!("Validation failed for the following color pairs:");
                 for warning in &warnings {
+                    warn!(warning = %warning, "validation failure");
                     eprintln!("  {warning}");
                 }
                 bail!("Validation failed");
             }
             for warning in &warnings {
+                warn!(warning = %warning, "validation warning");
                 eprintln!("Warning: {warning}");
             }
         }
 
-        // Serialize to YAML using serde
         let yaml = serde_yaml::to_string(&scheme).wrap_err("Failed to serialize scheme to YAML")?;
 
-        // Output
         if let Some(ref base_path) = cli.output {
             let output_path = if matches!(cli.variant, VariantArg::Both) {
                 variant_filename(base_path, &scheme.variant)
@@ -108,6 +97,7 @@ fn main() -> Result<()> {
                 base_path.clone()
             };
 
+            info!(path = %output_path.display(), "wrote scheme");
             std::fs::write(&output_path, &yaml)
                 .wrap_err_with(|| format!("Failed to write to {}", output_path.display()))?;
             eprintln!("Wrote scheme to {}", output_path.display());

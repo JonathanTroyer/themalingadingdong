@@ -1,6 +1,6 @@
 //! Hue overrides grid Component with 8 hue sliders.
 
-use crossterm_actions::{AppEvent, InputEvent, NavigationEvent, SelectionEvent, TuiEvent};
+use crossterm_actions::{InputEvent, NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -14,11 +14,9 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::event::{UserEvent, dispatcher};
+use crate::interpolation::DEFAULT_BASE16_HUES;
 use crate::tui::msg::Msg;
-
-/// Default hues for accent colors (degrees).
-const DEFAULT_HUES: [f32; 8] = [25.0, 55.0, 90.0, 145.0, 180.0, 250.0, 285.0, 335.0];
+use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
 
 /// Hue color names.
 const HUE_NAMES: [&str; 8] = [
@@ -50,7 +48,7 @@ impl HueGrid {
     fn start_editing(&mut self) {
         self.editing = true;
         // Initialize buffer with current value
-        let current = self.hues[self.selected].unwrap_or(DEFAULT_HUES[self.selected]);
+        let current = self.hues[self.selected].unwrap_or(DEFAULT_BASE16_HUES[self.selected]);
         self.edit_buffer = format!("{:.0}", current);
     }
 
@@ -84,7 +82,7 @@ impl HueGrid {
     }
 
     fn adjust_current(&mut self, delta: f64) {
-        let current = self.hues[self.selected].unwrap_or(DEFAULT_HUES[self.selected]);
+        let current = self.hues[self.selected].unwrap_or(DEFAULT_BASE16_HUES[self.selected]);
         let new_val = (current + delta as f32).rem_euclid(360.0);
         self.hues[self.selected] = Some(new_val);
     }
@@ -108,7 +106,7 @@ impl HueGrid {
             let para = Paragraph::new(line);
             frame.render_widget(para, area);
         } else {
-            let value = self.hues[index].unwrap_or(DEFAULT_HUES[index]);
+            let value = self.hues[index].unwrap_or(DEFAULT_BASE16_HUES[index]);
             let style = if focused {
                 Style::default()
                     .fg(Color::Cyan)
@@ -193,7 +191,9 @@ impl MockComponent for HueGrid {
         // Return selected index and current hue value
         State::Tup2((
             StateValue::U8(self.selected as u8),
-            StateValue::F64(self.hues[self.selected].unwrap_or(DEFAULT_HUES[self.selected]) as f64),
+            StateValue::F64(
+                self.hues[self.selected].unwrap_or(DEFAULT_BASE16_HUES[self.selected]) as f64,
+            ),
         ))
     }
 
@@ -284,12 +284,11 @@ impl Component<Msg, UserEvent> for HueGrid {
         // Use dispatcher to convert to semantic action
         let action = dispatcher().dispatch(&key_event)?;
 
-        match action {
-            // Global actions → bubble up as Msg
-            TuiEvent::App(AppEvent::Quit) => Some(Msg::Quit),
-            TuiEvent::App(AppEvent::Help) => Some(Msg::ShowHelp),
-            TuiEvent::App(AppEvent::Refresh) => Some(Msg::Regenerate),
+        if let Some(msg) = handle_global_app_events(&action) {
+            return Some(msg);
+        }
 
+        match action {
             // Enter starts editing with current value pre-filled
             TuiEvent::Input(InputEvent::Confirm) => {
                 self.start_editing();

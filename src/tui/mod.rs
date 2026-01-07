@@ -5,14 +5,14 @@
 
 mod app;
 mod components;
-mod event;
-mod ids;
 mod model;
 mod msg;
 
 use std::io::stdout;
+use std::sync::LazyLock;
 
 use color_eyre::eyre::Result;
+use crossterm_actions::{AppEvent, EditingMode, TuiEvent, TuiRealmDispatcher};
 use ratatui::{
     Terminal,
     crossterm::ExecutableCommand,
@@ -32,9 +32,64 @@ pub use model::Model;
 
 use app::{FocusManager, create_application, mount_components};
 use components::{Palette, Preview, Validation};
-use event::UserEvent;
-use ids::Id;
 use msg::Msg;
+
+// ============================================================================
+// Component identifiers (merged from ids.rs)
+// ============================================================================
+
+/// Unique identifiers for all components in the TUI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Id {
+    // Display panels (read-only)
+    Palette,
+    Preview,
+
+    // Parameter groups (editable)
+    BackgroundPicker,
+    ForegroundPicker,
+    CurveControls,
+    WeightControls,
+    AccentControls,
+    ExtendedAccentControls,
+    HueOverrides,
+
+    // Scrollable panel
+    Validation,
+}
+
+// ============================================================================
+// Event handling (merged from event.rs)
+// ============================================================================
+
+/// Custom user events (currently unused, but required by tui-realm).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UserEvent {}
+
+/// Global dispatcher instance - shared by all components.
+/// Using LazyLock for zero-cost lazy initialization.
+pub static DISPATCHER: LazyLock<TuiRealmDispatcher> =
+    LazyLock::new(|| TuiRealmDispatcher::with_defaults(EditingMode::Emacs));
+
+/// Convenience function for components to access the dispatcher.
+pub fn dispatcher() -> &'static TuiRealmDispatcher {
+    &DISPATCHER
+}
+
+/// Handle global application events that are common across all components.
+/// Returns Some(Msg) if the action was handled, None otherwise.
+pub fn handle_global_app_events(action: &TuiEvent) -> Option<Msg> {
+    match action {
+        TuiEvent::App(AppEvent::Quit) => Some(Msg::Quit),
+        TuiEvent::App(AppEvent::Help) => Some(Msg::ShowHelp),
+        TuiEvent::App(AppEvent::Refresh) => Some(Msg::Regenerate),
+        _ => None,
+    }
+}
+
+// ============================================================================
+// TUI entry point
+// ============================================================================
 
 /// Run the interactive TUI using tui-realm.
 pub fn run(cli: &Cli) -> Result<()> {
@@ -70,8 +125,6 @@ fn run_loop(
 ) -> Result<()> {
     // Focus manager for Tab/Shift-Tab navigation
     let mut focus = FocusManager::new();
-    // Initialize visible components based on model state
-    focus.update_visible(model);
 
     while !model.quit {
         // Draw UI
@@ -117,7 +170,7 @@ fn run_loop(
             // Right column: Parameters (fixed) + Validation (grows)
             let right_rows = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(21), Constraint::Min(8)])
+                .constraints([Constraint::Length(30), Constraint::Min(8)])
                 .split(cols[1]);
 
             // Render components
@@ -130,56 +183,46 @@ fn run_loop(
             let params_inner = params_block.inner(params_area);
             frame.render_widget(params_block, params_area);
 
-            // Determine if strength sliders should be shown
-            let show_j_strength = model.interpolation.lightness.curve_type.uses_strength();
-            let show_m_strength = model.interpolation.chroma.curve_type.uses_strength();
-            let show_h_strength = model.interpolation.hue.curve_type.uses_strength();
-            let j_strength_height = if show_j_strength { 1 } else { 0 };
-            let m_strength_height = if show_m_strength { 1 } else { 0 };
-            let h_strength_height = if show_h_strength { 1 } else { 0 };
+            // Calculate curve controls height (3 type rows + conditional strength rows)
+            let curve_height =
+                3 + if model.interpolation.lightness.curve_type.uses_strength() {
+                    1
+                } else {
+                    0
+                } + if model.interpolation.chroma.curve_type.uses_strength() {
+                    1
+                } else {
+                    0
+                } + if model.interpolation.hue.curve_type.uses_strength() {
+                    1
+                } else {
+                    0
+                };
 
             let param_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3),                 // Background picker (J/M/h)
-                    Constraint::Length(3),                 // Foreground picker (J/M/h)
-                    Constraint::Length(1),                 // Spacer
-                    Constraint::Length(1),                 // Lightness curve
-                    Constraint::Length(j_strength_height), // Lightness strength (only for sigmoid)
-                    Constraint::Length(1),                 // Chroma curve
-                    Constraint::Length(m_strength_height), // Chroma strength (only for sigmoid)
-                    Constraint::Length(1),                 // Hue curve
-                    Constraint::Length(h_strength_height), // Hue strength (only for sigmoid)
-                    Constraint::Length(1),                 // Spacer
-                    Constraint::Length(1),                 // Target contrast
-                    Constraint::Length(1),                 // Extended contrast
-                    Constraint::Length(1),                 // Accent colorfulness
-                    Constraint::Length(1),                 // Extended colorfulness
-                    Constraint::Length(1),                 // Spacer
-                    Constraint::Length(3),                 // Hue overrides
+                    Constraint::Length(3),            // 0: Background picker (J/M/h)
+                    Constraint::Length(3),            // 1: Foreground picker (J/M/h)
+                    Constraint::Length(1),            // 2: Spacer
+                    Constraint::Length(curve_height), // 3: Curve controls (grouped)
+                    Constraint::Length(2),            // 4: Weight controls (grouped)
+                    Constraint::Length(1),            // 5: Spacer
+                    Constraint::Length(5),            // 6: Accent controls (grouped)
+                    Constraint::Length(5),            // 7: Extended accent controls (grouped)
+                    Constraint::Length(1),            // 8: Spacer
+                    Constraint::Length(3),            // 9: Hue overrides
                     Constraint::Min(0),
                 ])
                 .split(params_inner);
 
             app.view(&Id::BackgroundPicker, frame, param_rows[0]);
             app.view(&Id::ForegroundPicker, frame, param_rows[1]);
-            app.view(&Id::LightnessCurve, frame, param_rows[3]);
-            if show_j_strength {
-                app.view(&Id::LightnessStrength, frame, param_rows[4]);
-            }
-            app.view(&Id::ChromaCurve, frame, param_rows[5]);
-            if show_m_strength {
-                app.view(&Id::ChromaStrength, frame, param_rows[6]);
-            }
-            app.view(&Id::HueCurve, frame, param_rows[7]);
-            if show_h_strength {
-                app.view(&Id::HueStrength, frame, param_rows[8]);
-            }
-            app.view(&Id::TargetContrast, frame, param_rows[10]);
-            app.view(&Id::ExtendedContrast, frame, param_rows[11]);
-            app.view(&Id::AccentColorfulness, frame, param_rows[12]);
-            app.view(&Id::ExtendedColorfulness, frame, param_rows[13]);
-            app.view(&Id::HueOverrides, frame, param_rows[15]);
+            app.view(&Id::CurveControls, frame, param_rows[3]);
+            app.view(&Id::WeightControls, frame, param_rows[4]);
+            app.view(&Id::AccentControls, frame, param_rows[6]);
+            app.view(&Id::ExtendedAccentControls, frame, param_rows[7]);
+            app.view(&Id::HueOverrides, frame, param_rows[9]);
 
             // Validation panel
             app.view(&Id::Validation, frame, right_rows[1]);
@@ -228,8 +271,6 @@ fn run_loop(
                 // Sync display components after regeneration
                 if needs_sync {
                     sync_display_components(app, model, &focus);
-                    // Update visible components (e.g., strength slider visibility)
-                    focus.update_visible(model);
                 }
             }
             Err(_) => {

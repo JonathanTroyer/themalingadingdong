@@ -1,6 +1,6 @@
-//! Reusable slider MockComponent.
+//! Grouped optimization weight controls component.
 
-use crossterm_actions::{AppEvent, NavigationEvent, SelectionEvent, TuiEvent};
+use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -9,86 +9,77 @@ use ratatui::{
     widgets::Paragraph,
 };
 use tuirealm::{
-    Component, Event, MockComponent, State, StateValue,
+    Component, Event, MockComponent, State,
     command::{Cmd, CmdResult, Direction as CmdDirection},
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::event::{UserEvent, dispatcher};
 use crate::tui::msg::Msg;
+use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
 
-/// Type of slider (determines which Msg to send on change).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SliderType {
-    MinContrast,
-    ExtendedMinContrast,
-    AccentColorfulness,
-    ExtendedColorfulness,
-    LightnessStrength,
-    ChromaStrength,
-    HueStrength,
+/// Which weight is focused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WeightFocus {
+    #[default]
+    ContrastWeight,
+    JWeight,
 }
 
-/// Configuration for a slider.
-#[derive(Debug, Clone)]
-pub struct SliderConfig {
-    pub label: String,
-    pub min: f64,
-    pub max: f64,
-    pub step: f64,
-    pub precision: usize,
-    pub suffix: String,
-    pub slider_type: SliderType,
-}
-
-impl Default for SliderConfig {
-    fn default() -> Self {
-        Self {
-            label: String::new(),
-            min: 0.0,
-            max: 100.0,
-            step: 1.0,
-            precision: 2,
-            suffix: String::new(),
-            slider_type: SliderType::MinContrast,
+impl WeightFocus {
+    fn next(self) -> Self {
+        match self {
+            Self::ContrastWeight => Self::JWeight,
+            Self::JWeight => Self::ContrastWeight,
         }
+    }
+
+    fn prev(self) -> Self {
+        self.next() // Only 2 options, prev == next
     }
 }
 
-/// A horizontal slider with label and value display.
-pub struct Slider {
-    props: Props,
-    value: f64,
-    config: SliderConfig,
+/// Values for weight controls.
+#[derive(Debug, Clone, Copy)]
+pub struct WeightValues {
+    /// Contrast weight (Lc), range 0-1
+    pub contrast_weight: f32,
+    /// Uniformity weight (J'), range 0-1
+    pub j_weight: f32,
 }
 
-impl Slider {
-    pub fn new(config: SliderConfig, initial_value: f64) -> Self {
+/// Grouped optimization weight controls with sub-focus navigation.
+pub struct WeightControls {
+    props: Props,
+    values: WeightValues,
+    sub_focus: WeightFocus,
+}
+
+impl WeightControls {
+    pub fn new(values: WeightValues) -> Self {
         Self {
             props: Props::default(),
-            value: initial_value.clamp(config.min, config.max),
-            config,
+            values,
+            sub_focus: WeightFocus::ContrastWeight,
         }
     }
 
-    fn adjust(&mut self, delta: f64) {
-        self.value = (self.value + delta).clamp(self.config.min, self.config.max);
+    fn adjust_current(&mut self, delta: f32) {
+        match self.sub_focus {
+            WeightFocus::ContrastWeight => {
+                self.values.contrast_weight = (self.values.contrast_weight + delta).clamp(0.0, 1.0);
+            }
+            WeightFocus::JWeight => {
+                self.values.j_weight = (self.values.j_weight + delta).clamp(0.0, 1.0);
+            }
+        }
     }
-}
 
-impl MockComponent for Slider {
-    fn view(&mut self, frame: &mut Frame, area: Rect) {
-        let focused = self
-            .props
-            .get_or(Attribute::Focus, AttrValue::Flag(false))
-            .unwrap_flag();
-
+    fn draw_slider(&self, frame: &mut Frame, area: Rect, label: &str, value: f32, focused: bool) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Length(15), Constraint::Min(10)])
             .split(area);
 
-        // Label
         let label_style = if focused {
             Style::default()
                 .fg(Color::Cyan)
@@ -96,13 +87,11 @@ impl MockComponent for Slider {
         } else {
             Style::default()
         };
-        let label_text = Paragraph::new(format!("{}:", self.config.label)).style(label_style);
+        let label_text = Paragraph::new(format!("{}:", label)).style(label_style);
         frame.render_widget(label_text, cols[0]);
 
-        // Slider
         let slider_width = cols[1].width.saturating_sub(8) as usize;
-        let ratio = (self.value - self.config.min) / (self.config.max - self.config.min);
-        let pos = (ratio * slider_width as f64).round() as usize;
+        let pos = (f64::from(value) * slider_width as f64).round() as usize;
         let pos = pos.min(slider_width.saturating_sub(1));
 
         let (filled_style, empty_style, handle_style) = if focused {
@@ -130,10 +119,7 @@ impl MockComponent for Slider {
             }
         }
 
-        let value_str = format!(
-            " {:.*}{}",
-            self.config.precision, self.value, self.config.suffix
-        );
+        let value_str = format!(" {:.2}", value);
         spans.push(Span::styled(
             value_str,
             if focused {
@@ -146,6 +132,39 @@ impl MockComponent for Slider {
         let slider_line = Paragraph::new(Line::from(spans));
         frame.render_widget(slider_line, cols[1]);
     }
+}
+
+impl MockComponent for WeightControls {
+    fn view(&mut self, frame: &mut Frame, area: Rect) {
+        let focused = self
+            .props
+            .get_or(Attribute::Focus, AttrValue::Flag(false))
+            .unwrap_flag();
+
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Lc Weight
+                Constraint::Length(1), // J Weight
+            ])
+            .split(area);
+
+        self.draw_slider(
+            frame,
+            rows[0],
+            "Lc Weight",
+            self.values.contrast_weight,
+            focused && self.sub_focus == WeightFocus::ContrastWeight,
+        );
+
+        self.draw_slider(
+            frame,
+            rows[1],
+            "J Weight",
+            self.values.j_weight,
+            focused && self.sub_focus == WeightFocus::JWeight,
+        );
+    }
 
     fn query(&self, attr: Attribute) -> Option<AttrValue> {
         self.props.get(attr)
@@ -156,17 +175,25 @@ impl MockComponent for Slider {
     }
 
     fn state(&self) -> State {
-        State::One(StateValue::F64(self.value))
+        State::None
     }
 
     fn perform(&mut self, cmd: Cmd) -> CmdResult {
         match cmd {
+            Cmd::Move(CmdDirection::Up) => {
+                self.sub_focus = self.sub_focus.prev();
+                CmdResult::None
+            }
+            Cmd::Move(CmdDirection::Down) => {
+                self.sub_focus = self.sub_focus.next();
+                CmdResult::None
+            }
             Cmd::Move(CmdDirection::Left) => {
-                self.adjust(-self.config.step);
+                self.adjust_current(-0.05);
                 CmdResult::Changed(self.state())
             }
             Cmd::Move(CmdDirection::Right) => {
-                self.adjust(self.config.step);
+                self.adjust_current(0.05);
                 CmdResult::Changed(self.state())
             }
             _ => CmdResult::None,
@@ -174,7 +201,7 @@ impl MockComponent for Slider {
     }
 }
 
-impl Component<Msg, UserEvent> for Slider {
+impl Component<Msg, UserEvent> for WeightControls {
     fn on(&mut self, ev: Event<UserEvent>) -> Option<Msg> {
         let focused = self
             .props
@@ -185,25 +212,27 @@ impl Component<Msg, UserEvent> for Slider {
             return None;
         }
 
-        // Extract keyboard event
         let Event::Keyboard(key_event) = ev else {
             return None;
         };
 
-        // Use dispatcher to convert to semantic action
         let action = dispatcher().dispatch(&key_event)?;
 
-        match action {
-            // Global actions → bubble up as Msg
-            TuiEvent::App(AppEvent::Quit) => Some(Msg::Quit),
-            TuiEvent::App(AppEvent::Help) => Some(Msg::ShowHelp),
-            TuiEvent::App(AppEvent::Refresh) => Some(Msg::Regenerate),
+        if let Some(msg) = handle_global_app_events(&action) {
+            return Some(msg);
+        }
 
-            // Focus navigation → bubble up as Msg
+        match action {
             TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
             TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
-
-            // Value adjustment
+            TuiEvent::Navigation(NavigationEvent::Up) => {
+                self.perform(Cmd::Move(CmdDirection::Up));
+                None
+            }
+            TuiEvent::Navigation(NavigationEvent::Down) => {
+                self.perform(Cmd::Move(CmdDirection::Down));
+                None
+            }
             TuiEvent::Navigation(NavigationEvent::Left) => {
                 if let CmdResult::Changed(_) = self.perform(Cmd::Move(CmdDirection::Left)) {
                     self.msg_for_change()
@@ -218,28 +247,18 @@ impl Component<Msg, UserEvent> for Slider {
                     None
                 }
             }
-
             _ => None,
         }
     }
 }
 
-impl Slider {
+impl WeightControls {
     fn msg_for_change(&self) -> Option<Msg> {
-        match self.config.slider_type {
-            SliderType::MinContrast => Some(Msg::MinContrastChanged(self.value)),
-            SliderType::ExtendedMinContrast => Some(Msg::ExtendedMinContrastChanged(self.value)),
-            SliderType::AccentColorfulness => {
-                Some(Msg::AccentColorfulnessChanged(self.value as f32))
+        match self.sub_focus {
+            WeightFocus::ContrastWeight => {
+                Some(Msg::ContrastWeightChanged(self.values.contrast_weight))
             }
-            SliderType::ExtendedColorfulness => {
-                Some(Msg::ExtendedColorfulnessChanged(self.value as f32))
-            }
-            SliderType::LightnessStrength => {
-                Some(Msg::LightnessCurveStrengthChanged(self.value as f32))
-            }
-            SliderType::ChromaStrength => Some(Msg::ChromaCurveStrengthChanged(self.value as f32)),
-            SliderType::HueStrength => Some(Msg::HueCurveStrengthChanged(self.value as f32)),
+            WeightFocus::JWeight => Some(Msg::JWeightChanged(self.values.j_weight)),
         }
     }
 }

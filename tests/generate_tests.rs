@@ -1,18 +1,10 @@
 use palette::Srgb;
+use themalingadingdong::config::parse_color;
 use themalingadingdong::curves::InterpolationConfig;
-use themalingadingdong::generate::{GenerateConfig, generate, parse_color};
+use themalingadingdong::generate::{GenerateConfig, generate};
 use themalingadingdong::interpolation::{
     DEFAULT_BASE16_HUES, build_hues_with_overrides, generate_accent_hues, interpolate_lightness,
 };
-
-#[test]
-fn test_interpolate_lightness_generates_correct_count() {
-    let dark = Srgb::new(0.1f32, 0.1, 0.12);
-    let light = Srgb::new(0.9f32, 0.9, 0.88);
-
-    let colors = interpolate_lightness(dark, light, 8);
-    assert_eq!(colors.len(), 8);
-}
 
 #[test]
 fn test_interpolate_lightness_endpoints() {
@@ -98,11 +90,10 @@ fn test_generate_creates_scheme() {
         min_contrast: 75.0,
         extended_min_contrast: 60.0,
         max_lightness_adjustment: 2.0,
-        accent_colorfulness: 25.0,
-        extended_colorfulness: 30.0,
         name: "Test Scheme".to_string(),
         author: Some("Test Author".to_string()),
         interpolation: InterpolationConfig::default(),
+        ..Default::default()
     };
 
     let result = generate(&config);

@@ -5,31 +5,22 @@ use std::time::Duration;
 use tuirealm::{Application, EventListenerCfg};
 
 use super::components::params::{
-    CycleSelector, HellwigPicker, HellwigPickerType, HellwigValues, HueGrid, SelectorType, Slider,
-    SliderConfig, SliderType,
+    AccentControls, AccentControlsType, AccentValues, CurveControls, CurveValues, HellwigPicker,
+    HellwigPickerType, HellwigValues, HueGrid, WeightControls, WeightValues,
 };
 use super::components::{Palette, Preview, Validation};
-use super::event::UserEvent;
-use super::ids::Id;
 use super::model::Model;
 use super::msg::Msg;
-use crate::curves::CurveType;
+use super::{Id, UserEvent};
 
 /// All focusable component IDs in order.
-/// Some may be conditionally hidden (like strength sliders when sigmoid not selected).
 const ALL_FOCUS_IDS: &[Id] = &[
     Id::BackgroundPicker,
     Id::ForegroundPicker,
-    Id::LightnessCurve,
-    Id::LightnessStrength,
-    Id::ChromaCurve,
-    Id::ChromaStrength,
-    Id::HueCurve,
-    Id::HueStrength,
-    Id::TargetContrast,
-    Id::ExtendedContrast,
-    Id::AccentColorfulness,
-    Id::ExtendedColorfulness,
+    Id::CurveControls,
+    Id::WeightControls,
+    Id::AccentControls,
+    Id::ExtendedAccentControls,
     Id::HueOverrides,
     Id::Validation,
 ];
@@ -90,143 +81,51 @@ pub fn mount_components(
     let hue_grid = HueGrid::new(model.hue_overrides);
     app.mount(Id::HueOverrides, Box::new(hue_grid), vec![])?;
 
-    // Curve selectors for J/M/h interpolation
-    let lightness_curve = CycleSelector::new(
-        "J Curve",
-        curve_type_options(),
-        curve_type_index(model.interpolation.lightness.curve_type),
-        SelectorType::Lightness,
-    );
-    app.mount(Id::LightnessCurve, Box::new(lightness_curve), vec![])?;
+    // Grouped curve controls (J/M/h interpolation)
+    let curve_controls = CurveControls::new(CurveValues {
+        j_type: model.interpolation.lightness.curve_type,
+        j_strength: model.interpolation.lightness.strength,
+        m_type: model.interpolation.chroma.curve_type,
+        m_strength: model.interpolation.chroma.strength,
+        h_type: model.interpolation.hue.curve_type,
+        h_strength: model.interpolation.hue.strength,
+    });
+    app.mount(Id::CurveControls, Box::new(curve_controls), vec![])?;
 
-    // Strength slider for sigmoid curve (only affects sigmoid)
-    let lightness_strength = Slider::new(
-        SliderConfig {
-            label: "  Strength".to_string(),
-            min: 0.1,
-            max: 5.0,
-            step: 0.05,
-            precision: 2,
-            suffix: String::new(),
-            slider_type: SliderType::LightnessStrength,
+    // Grouped weight controls (Lc/J optimization weights)
+    let weight_controls = WeightControls::new(WeightValues {
+        contrast_weight: model.accent_opt.contrast_weight,
+        j_weight: model.accent_opt.j_weight,
+    });
+    app.mount(Id::WeightControls, Box::new(weight_controls), vec![])?;
+
+    // Grouped accent controls (base08-base0F)
+    let accent_controls = AccentControls::new(
+        AccentControlsType::Base,
+        AccentValues {
+            min_contrast: model.min_contrast,
+            target_j: model.accent_opt.target_j,
+            delta_j: model.accent_opt.delta_j,
+            target_m: model.accent_opt.target_m,
+            delta_m: model.accent_opt.delta_m,
         },
-        f64::from(model.interpolation.lightness.strength),
     );
-    app.mount(Id::LightnessStrength, Box::new(lightness_strength), vec![])?;
+    app.mount(Id::AccentControls, Box::new(accent_controls), vec![])?;
 
-    let chroma_curve = CycleSelector::new(
-        "M Curve",
-        curve_type_options(),
-        curve_type_index(model.interpolation.chroma.curve_type),
-        SelectorType::Chroma,
-    );
-    app.mount(Id::ChromaCurve, Box::new(chroma_curve), vec![])?;
-
-    // Strength slider for chroma sigmoid curve
-    let chroma_strength = Slider::new(
-        SliderConfig {
-            label: "  Strength".to_string(),
-            min: 0.1,
-            max: 5.0,
-            step: 0.05,
-            precision: 2,
-            suffix: String::new(),
-            slider_type: SliderType::ChromaStrength,
+    // Grouped extended accent controls (base10-base17)
+    let extended_controls = AccentControls::new(
+        AccentControlsType::Extended,
+        AccentValues {
+            min_contrast: model.extended_min_contrast,
+            target_j: model.extended_accent_opt.target_j,
+            delta_j: model.extended_accent_opt.delta_j,
+            target_m: model.extended_accent_opt.target_m,
+            delta_m: model.extended_accent_opt.delta_m,
         },
-        f64::from(model.interpolation.chroma.strength),
-    );
-    app.mount(Id::ChromaStrength, Box::new(chroma_strength), vec![])?;
-
-    let hue_curve = CycleSelector::new(
-        "h Curve",
-        curve_type_options(),
-        curve_type_index(model.interpolation.hue.curve_type),
-        SelectorType::Hue,
-    );
-    app.mount(Id::HueCurve, Box::new(hue_curve), vec![])?;
-
-    // Strength slider for hue sigmoid curve
-    let hue_strength = Slider::new(
-        SliderConfig {
-            label: "  Strength".to_string(),
-            min: 0.1,
-            max: 5.0,
-            step: 0.05,
-            precision: 2,
-            suffix: String::new(),
-            slider_type: SliderType::HueStrength,
-        },
-        f64::from(model.interpolation.hue.strength),
-    );
-    app.mount(Id::HueStrength, Box::new(hue_strength), vec![])?;
-
-    // Contrast and colorfulness sliders
-    let min_contrast = Slider::new(
-        SliderConfig {
-            label: "Min Lc".to_string(),
-            min: 30.0,
-            max: 90.0,
-            step: 1.0,
-            precision: 0,
-            suffix: String::new(),
-            slider_type: SliderType::MinContrast,
-        },
-        model.min_contrast,
-    );
-    app.mount(Id::TargetContrast, Box::new(min_contrast), vec![])?;
-
-    let extended_min_contrast = Slider::new(
-        SliderConfig {
-            label: "Ext Min Lc".to_string(),
-            min: 30.0,
-            max: 90.0,
-            step: 1.0,
-            precision: 0,
-            suffix: String::new(),
-            slider_type: SliderType::ExtendedMinContrast,
-        },
-        model.extended_min_contrast,
     );
     app.mount(
-        Id::ExtendedContrast,
-        Box::new(extended_min_contrast),
-        vec![],
-    )?;
-
-    // Colorfulness sliders (HellwigJmh M scale, 0-50 is typical for UI accents)
-    let accent_colorfulness = Slider::new(
-        SliderConfig {
-            label: "Accent M".to_string(),
-            min: 0.0,
-            max: 50.0,
-            step: 1.0,
-            precision: 0,
-            suffix: String::new(),
-            slider_type: SliderType::AccentColorfulness,
-        },
-        f64::from(model.accent_colorfulness),
-    );
-    app.mount(
-        Id::AccentColorfulness,
-        Box::new(accent_colorfulness),
-        vec![],
-    )?;
-
-    let extended_colorfulness = Slider::new(
-        SliderConfig {
-            label: "Extended M".to_string(),
-            min: 0.0,
-            max: 50.0,
-            step: 1.0,
-            precision: 0,
-            suffix: String::new(),
-            slider_type: SliderType::ExtendedColorfulness,
-        },
-        f64::from(model.extended_colorfulness),
-    );
-    app.mount(
-        Id::ExtendedColorfulness,
-        Box::new(extended_colorfulness),
+        Id::ExtendedAccentControls,
+        Box::new(extended_controls),
         vec![],
     )?;
 
@@ -245,76 +144,19 @@ pub fn mount_components(
     Ok(())
 }
 
-/// Get the list of curve type display names for selectors.
-fn curve_type_options() -> Vec<String> {
-    vec![
-        CurveType::Linear.display_name().to_string(),
-        CurveType::Smoothstep.display_name().to_string(),
-        CurveType::Smootherstep.display_name().to_string(),
-        CurveType::SmoothStart.display_name().to_string(),
-        CurveType::SmoothEnd.display_name().to_string(),
-        CurveType::Sigmoid.display_name().to_string(),
-        CurveType::BSpline.display_name().to_string(),
-    ]
-}
-
-/// Get the index of a curve type in the options list.
-fn curve_type_index(curve_type: CurveType) -> usize {
-    match curve_type {
-        CurveType::Linear => 0,
-        CurveType::Smoothstep => 1,
-        CurveType::Smootherstep => 2,
-        CurveType::SmoothStart => 3,
-        CurveType::SmoothEnd => 4,
-        CurveType::Sigmoid => 5,
-        CurveType::BSpline => 6,
-    }
-}
-
 /// Manages focus state for Tab navigation.
 pub struct FocusManager {
     current_idx: usize,
-    /// Current list of visible/focusable IDs
-    visible_ids: Vec<Id>,
 }
 
 impl FocusManager {
     pub fn new() -> Self {
-        Self {
-            current_idx: 0,
-            visible_ids: ALL_FOCUS_IDS.to_vec(),
-        }
-    }
-
-    /// Update which components are visible based on model state.
-    pub fn update_visible(&mut self, model: &Model) {
-        let show_lightness_strength = model.interpolation.lightness.curve_type.uses_strength();
-        let show_chroma_strength = model.interpolation.chroma.curve_type.uses_strength();
-        let show_hue_strength = model.interpolation.hue.curve_type.uses_strength();
-
-        self.visible_ids = ALL_FOCUS_IDS
-            .iter()
-            .copied()
-            .filter(|id| {
-                // Strength sliders only visible when sigmoid selected for that curve
-                match *id {
-                    Id::LightnessStrength => show_lightness_strength,
-                    Id::ChromaStrength => show_chroma_strength,
-                    Id::HueStrength => show_hue_strength,
-                    _ => true,
-                }
-            })
-            .collect();
-
-        // Clamp current index if it's now out of bounds
-        if self.current_idx >= self.visible_ids.len() {
-            self.current_idx = self.visible_ids.len().saturating_sub(1);
-        }
+        Self { current_idx: 0 }
     }
 
     /// Get the current focus component ID.
     pub fn current_focus(&self) -> Id {
-        self.visible_ids
+        ALL_FOCUS_IDS
             .get(self.current_idx)
             .copied()
             .unwrap_or(Id::BackgroundPicker)
@@ -322,18 +164,13 @@ impl FocusManager {
 
     /// Move focus to next component and return its ID.
     pub fn focus_next(&mut self) -> Id {
-        if !self.visible_ids.is_empty() {
-            self.current_idx = (self.current_idx + 1) % self.visible_ids.len();
-        }
+        self.current_idx = (self.current_idx + 1) % ALL_FOCUS_IDS.len();
         self.current_focus()
     }
 
     /// Move focus to previous component and return its ID.
     pub fn focus_prev(&mut self) -> Id {
-        if !self.visible_ids.is_empty() {
-            self.current_idx =
-                (self.current_idx + self.visible_ids.len() - 1) % self.visible_ids.len();
-        }
+        self.current_idx = (self.current_idx + ALL_FOCUS_IDS.len() - 1) % ALL_FOCUS_IDS.len();
         self.current_focus()
     }
 }

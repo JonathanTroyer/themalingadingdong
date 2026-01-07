@@ -1,6 +1,6 @@
 //! HellwigJmh color picker Component with J/M/h sliders.
 
-use crossterm_actions::{AppEvent, NavigationEvent, SelectionEvent, TuiEvent};
+use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use palette::Srgb;
 use ratatui::Frame;
 use ratatui::{
@@ -16,8 +16,8 @@ use tuirealm::{
 };
 
 use crate::hellwig::HellwigJmh;
-use crate::tui::event::{UserEvent, dispatcher};
 use crate::tui::msg::Msg;
+use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
 
 /// Which slider is focused within the picker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -359,13 +359,12 @@ impl Component<Msg, UserEvent> for HellwigPicker {
         // Use dispatcher to convert to semantic action
         let action = dispatcher().dispatch(&key_event)?;
 
-        match action {
-            // Global actions → bubble up as Msg
-            TuiEvent::App(AppEvent::Quit) => Some(Msg::Quit),
-            TuiEvent::App(AppEvent::Help) => Some(Msg::ShowHelp),
-            TuiEvent::App(AppEvent::Refresh) => Some(Msg::Regenerate),
+        if let Some(msg) = handle_global_app_events(&action) {
+            return Some(msg);
+        }
 
-            // Focus navigation → bubble up as Msg
+        match action {
+            // Focus navigation
             TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
             TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
 

@@ -14,7 +14,7 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::event::UserEvent;
+use crate::tui::UserEvent;
 use crate::tui::msg::Msg;
 
 /// Preview component showing sample text with palette colors.

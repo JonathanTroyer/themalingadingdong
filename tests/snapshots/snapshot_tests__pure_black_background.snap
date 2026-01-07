@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Pure Black
+variant: Dark
+base00: "#000000"
+base01: "#101010"
+base02: "#424041"
+base03: "#787677"
+base04: "#aca9aa"
+base05: "#d7d5d6"
+base06: "#f4f3f5"
+base07: "#ffffff"
+base08: "#ffbfb7"
+base09: "#ffc49b"
+base0a: "#edd08b"
+base0b: "#b2dea8"
+base0c: "#9cdccb"
+base0d: "#a7d1ff"
+base0e: "#c8c8fc"
+base0f: "#f6b8ea"
+base10: "#ff998e"
+base11: "#f4a870"
+base12: "#ddb857"
+base13: "#8bcd82"
+base14: "#60cab4"
+base15: "#73bbff"
+base16: "#acadfa"
+base17: "#eb95df"

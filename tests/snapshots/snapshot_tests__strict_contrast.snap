@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Strict Contrast
+variant: Dark
+base00: "#1a1a2e"
+base01: "#272b3d"
+base02: "#484f60"
+base03: "#707a88"
+base04: "#99a4af"
+base05: "#bfc8cf"
+base06: "#dce1e3"
+base07: "#eaeaea"
+base08: "#ffbfb7"
+base09: "#ffc49c"
+base0a: "#edd08b"
+base0b: "#b2dfa9"
+base0c: "#9cdccc"
+base0d: "#a7d1ff"
+base0e: "#c9c8fc"
+base0f: "#f6b8ea"
+base10: "#ff9a8f"
+base11: "#f4a871"
+base12: "#ddb957"
+base13: "#8bcd82"
+base14: "#60cbb4"
+base15: "#74bbff"
+base16: "#adaefa"
+base17: "#eb96df"

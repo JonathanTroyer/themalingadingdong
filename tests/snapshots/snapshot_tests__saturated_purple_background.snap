@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Saturated Purple
+variant: Dark
+base00: "#2d004d"
+base01: "#3c1a59"
+base02: "#5e4179"
+base03: "#876ca0"
+base04: "#af96c6"
+base05: "#d1bbe6"
+base06: "#e8d5fa"
+base07: "#f0e0ff"
+base08: "#ffbfb7"
+base09: "#ffc49b"
+base0a: "#edd08b"
+base0b: "#b2dea8"
+base0c: "#9cdccb"
+base0d: "#a7d1ff"
+base0e: "#c9c8fc"
+base0f: "#f6b8ea"
+base10: "#ff998e"
+base11: "#f4a870"
+base12: "#ddb857"
+base13: "#8bcd82"
+base14: "#60cab4"
+base15: "#73bbff"
+base16: "#acadfa"
+base17: "#eb95df"

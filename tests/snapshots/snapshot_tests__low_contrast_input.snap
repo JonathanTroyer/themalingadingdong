@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Low Contrast Input
+variant: Dark
+base00: "#404040"
+base01: "#424242"
+base02: "#474747"
+base03: "#4d4d4d"
+base04: "#545454"
+base05: "#5a5a5a"
+base06: "#5e5e5e"
+base07: "#606060"
+base08: "#ffbfb7"
+base09: "#ffc49c"
+base0a: "#edd08b"
+base0b: "#b2dfa9"
+base0c: "#9cdccc"
+base0d: "#a7d1ff"
+base0e: "#c9c8fc"
+base0f: "#f6b8ea"
+base10: "#ff9a8f"
+base11: "#f4a870"
+base12: "#ddb957"
+base13: "#8bcd82"
+base14: "#60cbb4"
+base15: "#74bbff"
+base16: "#adaefa"
+base17: "#eb96df"

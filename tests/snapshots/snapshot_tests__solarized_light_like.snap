@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Solarized Light Like
+variant: Light
+base00: "#fdf6e3"
+base01: "#f2f1dd"
+base02: "#dce2d0"
+base03: "#c0cabe"
+base04: "#a3b0a8"
+base05: "#879693"
+base06: "#708384"
+base07: "#657b83"
+base08: "#ffbdb5"
+base09: "#fec399"
+base0a: "#eccf89"
+base0b: "#b1dda7"
+base0c: "#9adbca"
+base0d: "#a4d0ff"
+base0e: "#c7c6fc"
+base0f: "#f6b6ea"
+base10: "#ff988c"
+base11: "#f3a76f"
+base12: "#dcb756"
+base13: "#8acb81"
+base14: "#5fc9b3"
+base15: "#71baff"
+base16: "#abacfa"
+base17: "#eb94df"

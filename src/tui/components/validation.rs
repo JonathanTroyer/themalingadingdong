@@ -1,6 +1,6 @@
 //! Validation results Component.
 
-use crossterm_actions::{AppEvent, NavigationEvent, SelectionEvent, TuiEvent};
+use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
     layout::Rect,
@@ -14,8 +14,8 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::event::{UserEvent, dispatcher};
 use crate::tui::msg::Msg;
+use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
 use crate::validation::{ValidationResult, ValidationResults};
 
 /// Validation results display with scrolling.
@@ -131,8 +131,8 @@ impl Validation {
         let ui_colors = ["base06", "base07"];
         for fg in ui_colors {
             if let Some(data) = fg_data.get(fg) {
-                // UI colors don't have HellwigJmh, so no clipping info
-                let (icon, style) = self.status_style(data.passes, false);
+                // UI colors don't have HellwigJmh or M bounds data
+                let (icon, style) = self.status_style(data.passes, false, true);
                 let lc00_str = data.lc00.map(|v| format!("{:.0}", v)).unwrap_or_default();
                 let lc01_str = data.lc01.map(|v| format!("{:.0}", v)).unwrap_or_default();
                 let text = format!(
@@ -217,9 +217,10 @@ impl Validation {
         lc01: Option<f64>,
         passes: bool,
     ) -> Line<'static> {
-        // Check if color was clipped (HellwigJmh out of sRGB gamut)
-        let is_clipped = result.fg_hellwig.map(|h| !h.is_in_gamut()).unwrap_or(false);
-        let (icon, style) = self.status_style(passes, is_clipped);
+        // Check gamut mapping and M bounds status
+        let was_gamut_mapped = result.was_gamut_mapped;
+        let m_in_bounds = result.m_in_bounds;
+        let (icon, style) = self.status_style(passes, was_gamut_mapped, m_in_bounds);
 
         let (j, m, h) = result
             .fg_hellwig
@@ -246,14 +247,22 @@ impl Validation {
         Line::from(Span::styled(text, style))
     }
 
-    /// Get status message and style based on contrast and gamut.
-    fn status_style(&self, passes: bool, is_clipped: bool) -> (&'static str, Style) {
+    /// Get status message and style based on contrast, gamut, and M bounds.
+    fn status_style(
+        &self,
+        passes: bool,
+        was_gamut_mapped: bool,
+        m_in_bounds: bool,
+    ) -> (&'static str, Style) {
         if !passes {
             // Failing - contrast too low
             (" Lc unreachable", Style::default().fg(Color::Red))
-        } else if is_clipped {
-            // Passing but color was clipped
-            (" clipped", Style::default().fg(Color::Yellow))
+        } else if !m_in_bounds {
+            // M is outside the specified delta_m bounds
+            (" M out of bounds", Style::default().fg(Color::Red))
+        } else if was_gamut_mapped {
+            // Passing but color was gamut mapped
+            (" gamut mapped", Style::default().fg(Color::Yellow))
         } else {
             // Passing, no issues
             ("", Style::default().fg(Color::Green))
@@ -367,13 +376,12 @@ impl Component<Msg, UserEvent> for Validation {
         // Use dispatcher to convert to semantic action
         let action = dispatcher().dispatch(&key_event)?;
 
-        match action {
-            // Global actions → bubble up as Msg
-            TuiEvent::App(AppEvent::Quit) => Some(Msg::Quit),
-            TuiEvent::App(AppEvent::Help) => Some(Msg::ShowHelp),
-            TuiEvent::App(AppEvent::Refresh) => Some(Msg::Regenerate),
+        if let Some(msg) = handle_global_app_events(&action) {
+            return Some(msg);
+        }
 
-            // Focus navigation → bubble up as Msg
+        match action {
+            // Focus navigation
             TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
             TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
 

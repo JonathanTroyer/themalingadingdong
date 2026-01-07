@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Dark Palette
+variant: Dark
+base00: "#1a1a2e"
+base01: "#272b3d"
+base02: "#484f60"
+base03: "#707a88"
+base04: "#99a4af"
+base05: "#bfc8cf"
+base06: "#dce1e3"
+base07: "#eaeaea"
+base08: "#ffbfb7"
+base09: "#ffc49b"
+base0a: "#edd08b"
+base0b: "#b2dea8"
+base0c: "#9cdccb"
+base0d: "#a7d1ff"
+base0e: "#c9c8fc"
+base0f: "#f6b8ea"
+base10: "#ff998e"
+base11: "#f4a870"
+base12: "#ddb857"
+base13: "#8bcd82"
+base14: "#60cab4"
+base15: "#73bbff"
+base16: "#acadfa"
+base17: "#eb95df"

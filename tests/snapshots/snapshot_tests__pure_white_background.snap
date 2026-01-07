@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Pure White
+variant: Light
+base00: "#ffffff"
+base01: "#f4f3f5"
+base02: "#d7d5d6"
+base03: "#aca9aa"
+base04: "#787677"
+base05: "#424041"
+base06: "#101010"
+base07: "#000000"
+base08: "#ffbdb5"
+base09: "#fec399"
+base0a: "#eccf89"
+base0b: "#b1dda7"
+base0c: "#9adbca"
+base0d: "#a4d0ff"
+base0e: "#c7c7fc"
+base0f: "#f6b6ea"
+base10: "#ff988c"
+base11: "#f3a76f"
+base12: "#dcb856"
+base13: "#8acc81"
+base14: "#5fcab3"
+base15: "#6fbaff"
+base16: "#abacfa"
+base17: "#eb94df"

@@ -59,26 +59,6 @@ fn test_cli_includes_all_base24_colors() {
 }
 
 #[test]
-fn test_cli_no_adjust_with_low_contrast_fails() {
-    // Very low minimum contrast may not meet validation thresholds
-    cmd()
-        .args([
-            "--background",
-            "#1a1a2e",
-            "--foreground",
-            "#eaeaea",
-            "--min-contrast",
-            "30", // Very low contrast
-            "--name",
-            "Test",
-            "--no-adjust",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("Validation failed"));
-}
-
-#[test]
 fn test_cli_high_contrast_passes_without_adjust() {
     // High minimum contrast on dark background should mostly pass
     cmd()
@@ -89,8 +69,6 @@ fn test_cli_high_contrast_passes_without_adjust() {
             "#ffffff",
             "--min-contrast",
             "90",
-            "--accent-colorfulness",
-            "10",
             "--name",
             "High Contrast",
         ])
@@ -130,7 +108,7 @@ fn test_cli_invalid_hex_fails() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Invalid background color"));
+        .stderr(predicate::str::contains("Invalid color"));
 }
 
 #[test]

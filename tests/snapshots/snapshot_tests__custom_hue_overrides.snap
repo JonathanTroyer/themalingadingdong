@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Custom Hues
+variant: Dark
+base00: "#1a1a2e"
+base01: "#272b3d"
+base02: "#484f60"
+base03: "#707a88"
+base04: "#99a4af"
+base05: "#bfc8cf"
+base06: "#dce1e3"
+base07: "#eaeaea"
+base08: "#ffbace"
+base09: "#ffc0b3"
+base0a: "#fdc699"
+base0b: "#cedb8c"
+base0c: "#9cdccb"
+base0d: "#99d4ff"
+base0e: "#bbccff"
+base0f: "#f1baee"
+base10: "#ff91b5"
+base11: "#ff9b87"
+base12: "#f1aa6c"
+base13: "#b4c758"
+base14: "#60cab4"
+base15: "#55c0ff"
+base16: "#97b3ff"
+base17: "#e598e4"

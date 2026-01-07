@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: High Colorfulness
+variant: Dark
+base00: "#1a1a2e"
+base01: "#272b3d"
+base02: "#484f60"
+base03: "#707a88"
+base04: "#99a4af"
+base05: "#bfc8cf"
+base06: "#dce1e3"
+base07: "#eaeaea"
+base08: "#ffbab2"
+base09: "#ffbc8d"
+base0a: "#fccc44"
+base0b: "#8be883"
+base0c: "#3ae7c8"
+base0d: "#a8d1ff"
+base0e: "#c8c7ff"
+base0f: "#ffacf2"
+base10: "#ffbfb7"
+base11: "#ffc49b"
+base12: "#ffca1c"
+base13: "#72ed6f"
+base14: "#00e8c8"
+base15: "#a8d1ff"
+base16: "#c8c7ff"
+base17: "#ffaff2"

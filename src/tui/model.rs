@@ -8,10 +8,11 @@ use tinted_builder::{Base16Scheme, SchemeVariant};
 use tuirealm::Update;
 
 use crate::cli::{Cli, VariantArg};
+use crate::config::{AccentOptSettings, ThemeConfig, load_config};
 use crate::curves::InterpolationConfig;
 use crate::generate::{GenerateConfig, generate_for_variant, parse_color};
 use crate::hellwig::HellwigJmh;
-use crate::validation::{ValidationResults, validate};
+use crate::validation::{ValidationResults, validate_with_accent_data};
 
 use super::msg::Msg;
 
@@ -68,13 +69,13 @@ pub struct Model {
     pub min_contrast: f64,
     pub extended_min_contrast: f64,
     pub max_lightness_adjustment: f32,
-    pub accent_colorfulness: f32,
-    pub extended_colorfulness: f32,
     pub hue_overrides: [Option<f32>; 8],
     pub variant: VariantArg,
     pub name: String,
     pub author: String,
     pub interpolation: InterpolationConfig,
+    pub accent_opt: AccentOptSettings,
+    pub extended_accent_opt: AccentOptSettings,
 
     // Derived sRGB colors
     pub background: Srgb<u8>,
@@ -92,17 +93,35 @@ pub struct Model {
 }
 
 impl Model {
-    /// Create model from CLI arguments.
+    /// Create model from CLI arguments using Figment configuration loading.
+    ///
+    /// This uses the same layered configuration as main.rs:
+    /// defaults < TOML file < CLI args
     pub fn from_cli(cli: &Cli) -> Result<Self> {
-        let bg_str = cli
+        // Load configuration with Figment layering
+        let theme_config = load_config(cli.config.as_deref(), &cli.to_config_overrides())
+            .map_err(|e| color_eyre::eyre::eyre!("Configuration error: {}", e))?;
+
+        Self::from_theme_config(&theme_config, cli.variant)
+    }
+
+    /// Create model from a ThemeConfig.
+    pub fn from_theme_config(config: &ThemeConfig, variant: VariantArg) -> Result<Self> {
+        let bg_str = config
+            .colors
             .background
             .clone()
             .unwrap_or_else(|| "#000000".to_string());
-        let fg_str = cli
+        let fg_str = config
+            .colors
             .foreground
             .clone()
             .unwrap_or_else(|| "#FFFFFF".to_string());
-        let name = cli.name.clone().unwrap_or_else(|| "My Theme".to_string());
+        let name = if config.theme.name.is_empty() {
+            "My Theme".to_string()
+        } else {
+            config.theme.name.clone()
+        };
 
         let background = parse_color(&bg_str)
             .map_err(|e| color_eyre::eyre::eyre!("Invalid background color: {}", e))?;
@@ -112,19 +131,26 @@ impl Model {
         let background_hellwig = HellwigComponents::from_srgb(background);
         let foreground_hellwig = HellwigComponents::from_srgb(foreground);
 
+        let hue_overrides = config
+            .colors
+            .hue_overrides
+            .as_ref()
+            .map(|h| h.to_array())
+            .unwrap_or([None; 8]);
+
         Ok(Self {
             background_hellwig,
             foreground_hellwig,
-            min_contrast: cli.min_contrast,
-            extended_min_contrast: cli.extended_min_contrast,
-            max_lightness_adjustment: cli.max_lightness_adjustment,
-            accent_colorfulness: cli.accent_colorfulness,
-            extended_colorfulness: cli.extended_colorfulness,
-            hue_overrides: cli.hue_overrides(),
-            variant: cli.variant,
+            min_contrast: config.contrast.minimum,
+            extended_min_contrast: config.contrast.extended_minimum,
+            max_lightness_adjustment: config.contrast.max_adjustment,
+            hue_overrides,
+            variant,
             name,
-            author: cli.author.clone().unwrap_or_default(),
-            interpolation: InterpolationConfig::default(),
+            author: config.theme.author.clone().unwrap_or_default(),
+            interpolation: config.curves.clone(),
+            accent_opt: config.optimization.clone(),
+            extended_accent_opt: config.extended_optimization.clone(),
 
             background,
             foreground,
@@ -148,8 +174,6 @@ impl Model {
             min_contrast: self.min_contrast,
             extended_min_contrast: self.extended_min_contrast,
             max_lightness_adjustment: self.max_lightness_adjustment,
-            accent_colorfulness: self.accent_colorfulness,
-            extended_colorfulness: self.extended_colorfulness,
             name: self.name.clone(),
             author: if self.author.is_empty() {
                 None
@@ -157,6 +181,8 @@ impl Model {
                 Some(self.author.clone())
             },
             interpolation: self.interpolation.clone(),
+            accent_opt: self.accent_opt.clone(),
+            extended_accent_opt: self.extended_accent_opt.clone(),
         }
     }
 
@@ -179,7 +205,11 @@ impl Model {
         };
 
         let result = generate_for_variant(&config, forced);
-        self.validation_results = Some(validate(&result.scheme));
+        self.validation_results = Some(validate_with_accent_data(
+            &result.scheme,
+            &result.base_accent_results,
+            &result.extended_accent_results,
+        ));
         self.generation_warnings = result.warnings;
         self.current_scheme = Some(result.scheme);
         self.message = None;
@@ -249,14 +279,6 @@ impl Update<Msg> for Model {
                 self.extended_min_contrast = v;
                 Some(Msg::Regenerate)
             }
-            Msg::AccentColorfulnessChanged(v) => {
-                self.accent_colorfulness = v;
-                Some(Msg::Regenerate)
-            }
-            Msg::ExtendedColorfulnessChanged(v) => {
-                self.extended_colorfulness = v;
-                Some(Msg::Regenerate)
-            }
 
             // Selectors
             Msg::VariantChanged(v) => {
@@ -293,6 +315,52 @@ impl Update<Msg> for Model {
                 if (idx as usize) < 8 {
                     self.hue_overrides[idx as usize] = val;
                 }
+                Some(Msg::Regenerate)
+            }
+
+            // Accent optimization settings
+            Msg::AccentTargetJChanged(v) => {
+                self.accent_opt.target_j = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::AccentDeltaJChanged(v) => {
+                self.accent_opt.delta_j = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::AccentTargetMChanged(v) => {
+                self.accent_opt.target_m = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::AccentDeltaMChanged(v) => {
+                self.accent_opt.delta_m = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::ExtendedTargetJChanged(v) => {
+                self.extended_accent_opt.target_j = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::ExtendedDeltaJChanged(v) => {
+                self.extended_accent_opt.delta_j = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::ExtendedTargetMChanged(v) => {
+                self.extended_accent_opt.target_m = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::ExtendedDeltaMChanged(v) => {
+                self.extended_accent_opt.delta_m = v;
+                Some(Msg::Regenerate)
+            }
+
+            // Optimization weight changes (shared between base and extended)
+            Msg::ContrastWeightChanged(v) => {
+                self.accent_opt.contrast_weight = v;
+                self.extended_accent_opt.contrast_weight = v;
+                Some(Msg::Regenerate)
+            }
+            Msg::JWeightChanged(v) => {
+                self.accent_opt.j_weight = v;
+                self.extended_accent_opt.j_weight = v;
                 Some(Msg::Regenerate)
             }
 
@@ -334,16 +402,10 @@ impl Update<Msg> for Model {
 
             // These messages don't need model updates
             Msg::ShowHelp
-            | Msg::HideHelp
-            | Msg::ShowExport
-            | Msg::HideExport
             | Msg::FocusNext
             | Msg::FocusPrev
-            | Msg::FocusUp
-            | Msg::FocusDown
             | Msg::ValidationScrollUp
-            | Msg::ValidationScrollDown
-            | Msg::None => None,
+            | Msg::ValidationScrollDown => None,
         }
     }
 }

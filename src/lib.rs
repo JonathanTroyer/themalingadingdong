@@ -1,10 +1,13 @@
+pub mod accent_solver;
 pub mod apca;
 pub mod cli;
 pub mod config;
-pub mod contrast_solver;
 pub mod curves;
+pub mod gamut_map;
 pub mod generate;
+pub mod generated;
 pub mod hellwig;
 pub mod interpolation;
+pub mod logging;
 pub mod tui;
 pub mod validation;

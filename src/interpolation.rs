@@ -2,7 +2,11 @@
 
 use palette::Srgb;
 
-use crate::contrast_solver::find_uniform_post_clamp_lightness;
+#[cfg(debug_assertions)]
+use tracing::instrument;
+
+use crate::accent_solver::optimize_accents;
+use crate::config::AccentOptSettings;
 use crate::curves::{InterpolationConfig, evaluate_curve};
 use crate::hellwig::HellwigJmh;
 
@@ -74,8 +78,10 @@ pub struct AccentResult {
     pub achieved_contrast: f64,
     /// Whether minimum contrast was achieved
     pub met_minimum: bool,
-    /// Whether color is within sRGB gamut
-    pub is_in_gamut: bool,
+    /// Whether color was gamut mapped (colorfulness reduced)
+    pub was_gamut_mapped: bool,
+    /// Whether M is within bounds after gamut mapping
+    pub m_in_bounds: bool,
     /// Warning if minimum couldn't be achieved for this hue
     pub warning: Option<String>,
 }
@@ -136,6 +142,7 @@ pub fn interpolate_lightness(start: Srgb<f32>, end: Srgb<f32>, steps: usize) -> 
 /// let colors = interpolate_with_curves(dark, light, 8, &curves);
 /// assert_eq!(colors.len(), 8);
 /// ```
+#[cfg_attr(debug_assertions, instrument(skip(start, end, curves), fields(steps)))]
 pub fn interpolate_with_curves(
     start: Srgb<f32>,
     end: Srgb<f32>,
@@ -149,28 +156,22 @@ pub fn interpolate_with_curves(
         return vec![start];
     }
 
-    // Convert to HellwigJmh for perceptually uniform interpolation
-    let start_u8 = srgb_to_u8(start);
-    let end_u8 = srgb_to_u8(end);
-    let start_hellwig = HellwigJmh::from_srgb_u8(start_u8);
-    let end_hellwig = HellwigJmh::from_srgb_u8(end_u8);
+    let start_hellwig = HellwigJmh::from_srgb_u8(srgb_to_u8(start));
+    let end_hellwig = HellwigJmh::from_srgb_u8(srgb_to_u8(end));
 
     (0..steps)
         .map(|i| {
             let linear_t = i as f32 / (steps - 1) as f32;
 
-            // Apply different curves to each component
             let t_j = evaluate_curve(&curves.lightness, linear_t);
             let t_m = evaluate_curve(&curves.chroma, linear_t);
             let t_h = evaluate_curve(&curves.hue, linear_t);
 
-            // Interpolate each component separately
             let j = lerp(start_hellwig.lightness, end_hellwig.lightness, t_j);
             let m = lerp(start_hellwig.colorfulness, end_hellwig.colorfulness, t_m);
             let h = lerp_hue(start_hellwig.hue, end_hellwig.hue, t_h);
 
-            let interpolated = HellwigJmh::new(j, m, h);
-            interpolated.into_srgb()
+            HellwigJmh::new(j, m, h).into_srgb()
         })
         .collect()
 }
@@ -267,66 +268,58 @@ pub fn generate_hues(start_hue: f32, count: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Generate accent colors with uniform lightness optimization.
+/// Generate accent colors with COBYLA optimization.
 ///
-/// All hues share a near-uniform lightness while meeting minimum contrast.
-/// This produces more visually cohesive accent colors compared to per-hue
-/// exact contrast optimization.
+/// Optimizes (J', M) pairs for each hue using constrained optimization
+/// to balance lightness uniformity against colorfulness preservation.
 ///
 /// # Arguments
 ///
 /// * `hues` - Array of hue values (from `build_hues_with_overrides()`)
-/// * `colorfulness` - Colorfulness for all accents (HellwigJmh M)
+/// * `settings` - Optimization settings (targets, tolerances, weight)
 /// * `min_contrast` - Minimum APCA Lc value (floor, not exact target)
-/// * `max_adjustment` - Maximum per-hue lightness adjustment allowed (0-10 on J' scale)
 /// * `background` - Background color for contrast calculation
 ///
 /// # Returns
 ///
-/// Vector of `AccentResult` with uniform-lightness colors and any warnings.
+/// Vector of `AccentResult` with optimized colors and any warnings.
 ///
 /// # Example
 ///
 /// ```
 /// use palette::Srgb;
+/// use themalingadingdong::config::AccentOptSettings;
 /// use themalingadingdong::interpolation::{build_hues_with_overrides, generate_accents_uniform};
 ///
 /// let bg = Srgb::new(26u8, 26, 46);
 /// let hues = build_hues_with_overrides(&[None; 8]);
-/// let accents = generate_accents_uniform(&hues, 25.0, 60.0, 2.0, bg);
+/// let settings = AccentOptSettings::default();
+/// let accents = generate_accents_uniform(&hues, &settings, 60.0, bg);
 /// assert_eq!(accents.len(), 8);
 /// ```
+#[cfg_attr(debug_assertions, instrument(skip(hues, settings, background), fields(hue_count = hues.len())))]
 pub fn generate_accents_uniform(
     hues: &[f32],
-    colorfulness: f32,
+    settings: &AccentOptSettings,
     min_contrast: f64,
-    max_adjustment: f32,
     background: Srgb<u8>,
 ) -> Vec<AccentResult> {
-    let result = find_uniform_post_clamp_lightness(
-        background,
-        hues,
-        colorfulness,
-        min_contrast,
-        max_adjustment,
-    );
+    let result = optimize_accents(background, hues, settings, min_contrast);
 
     result
         .hue_results
         .into_iter()
         .map(|hr| {
-            let hellwig = HellwigJmh::new(hr.input_j, colorfulness, hr.hue);
-            let color = hellwig.into_srgb();
-
             AccentResult {
-                color,
+                color: hr.color,
                 hue: hr.hue,
-                lightness: hr.input_j,
+                lightness: hr.j,
                 post_clamp_lightness: hr.post_clamp_j,
-                j_deviation: hr.j_deviation,
+                j_deviation: hr.j - settings.target_j,
                 achieved_contrast: hr.achieved_contrast,
-                met_minimum: hr.met_minimum_contrast,
-                is_in_gamut: hr.is_in_gamut,
+                met_minimum: hr.met_constraints,
+                was_gamut_mapped: hr.original_m > hr.m + 0.8, // tolerance for numerical noise
+                m_in_bounds: hr.m_in_bounds,
                 warning: hr.warning,
             }
         })
@@ -366,11 +359,6 @@ pub fn srgb_to_f32(color: Srgb<u8>) -> Srgb<f32> {
 /// Convert sRGB to hex string (without # prefix).
 pub fn srgb_to_hex(color: Srgb<u8>) -> String {
     format!("{:02x}{:02x}{:02x}", color.red, color.green, color.blue)
-}
-
-/// Get HellwigJmh lightness (perceptually uniform, 0-100).
-pub fn hellwig_lightness(color: Srgb<u8>) -> f32 {
-    HellwigJmh::from_srgb_u8(color).lightness
 }
 
 /// Convert sRGB to HellwigJmh components (lightness, colorfulness, hue).

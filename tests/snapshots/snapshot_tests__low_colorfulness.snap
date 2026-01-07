@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+expression: snapshot
+---
+name: Low Colorfulness
+variant: Dark
+base00: "#1a1a2e"
+base01: "#272b3d"
+base02: "#484f60"
+base03: "#707a88"
+base04: "#99a4af"
+base05: "#bfc8cf"
+base06: "#dce1e3"
+base07: "#eaeaea"
+base08: "#ebc9c5"
+base09: "#e7cebe"
+base0a: "#e0d2b8"
+base0b: "#cad7c3"
+base0c: "#c3d5cf"
+base0d: "#c4d1e4"
+base0e: "#d1cee0"
+base0f: "#e2c9da"
+base10: "#f6c4be"
+base11: "#efcab3"
+base12: "#e4d2a9"
+base13: "#c2d9ba"
+base14: "#b7d7cd"
+base15: "#b8d1ef"
+base16: "#cecce9"
+base17: "#e9c3df"

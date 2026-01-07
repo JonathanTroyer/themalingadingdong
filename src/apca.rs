@@ -3,15 +3,13 @@
 //! Calculates perceptual contrast between foreground and background colors
 //! following the APCA-W3 specification for WCAG 3.0.
 
+use crate::generated::{GAMMA_LUT, GAMMA_LUT_F32, GAMMA_LUT_F32_SIZE};
 use palette::Srgb;
 
 /// APCA luminance coefficients for sRGB D65
 const COEF_R: f64 = 0.2126729;
 const COEF_G: f64 = 0.7151522;
 const COEF_B: f64 = 0.0721750;
-
-/// Gamma exponent for sRGB inverse companding
-const GAMMA: f64 = 2.4;
 
 /// Threshold for low-luminance soft clamp
 const LOW_Y_THRESHOLD: f64 = 0.022;
@@ -32,18 +30,50 @@ const EXP_FG_DARK: f64 = 0.62;
 
 /// Convert an sRGB color to APCA luminance (Y).
 pub fn srgb_to_luminance(color: Srgb<u8>) -> f64 {
-    let r_lin = (color.red as f64 / 255.0).powf(GAMMA);
-    let g_lin = (color.green as f64 / 255.0).powf(GAMMA);
-    let b_lin = (color.blue as f64 / 255.0).powf(GAMMA);
-
-    let mut y = COEF_R * r_lin + COEF_G * g_lin + COEF_B * b_lin;
+    let y = COEF_R * GAMMA_LUT[color.red as usize]
+        + COEF_G * GAMMA_LUT[color.green as usize]
+        + COEF_B * GAMMA_LUT[color.blue as usize];
 
     // Low-luminance soft clamp
     if y < LOW_Y_THRESHOLD {
-        y += (LOW_Y_THRESHOLD - y).powf(LOW_Y_EXPONENT);
+        y + (LOW_Y_THRESHOLD - y).powf(LOW_Y_EXPONENT)
+    } else {
+        y
     }
+}
 
-    y
+/// Look up gamma-corrected value from f32 LUT with linear interpolation.
+#[inline]
+fn gamma_f32(x: f32) -> f64 {
+    let x = x.clamp(0.0, 1.0);
+    let scale = (GAMMA_LUT_F32_SIZE - 1) as f32;
+    let idx_f = x * scale;
+    let idx = idx_f as usize;
+
+    if idx >= GAMMA_LUT_F32_SIZE - 1 {
+        GAMMA_LUT_F32[GAMMA_LUT_F32_SIZE - 1]
+    } else {
+        let t = (idx_f - idx as f32) as f64;
+        GAMMA_LUT_F32[idx] * (1.0 - t) + GAMMA_LUT_F32[idx + 1] * t
+    }
+}
+
+/// Convert an sRGB f32 color (0.0-1.0) to APCA luminance (Y).
+///
+/// Uses a 4096-entry LUT with linear interpolation for fast, accurate
+/// gamma correction without u8 precision loss.
+#[inline]
+pub fn srgb_f32_to_luminance(color: Srgb<f32>) -> f64 {
+    let y = COEF_R * gamma_f32(color.red)
+        + COEF_G * gamma_f32(color.green)
+        + COEF_B * gamma_f32(color.blue);
+
+    // Low-luminance soft clamp
+    if y < LOW_Y_THRESHOLD {
+        y + (LOW_Y_THRESHOLD - y).powf(LOW_Y_EXPONENT)
+    } else {
+        y
+    }
 }
 
 /// Calculate APCA contrast (Lc) between foreground and background colors.
@@ -74,6 +104,27 @@ pub fn apca_contrast(fg: Srgb<u8>, bg: Srgb<u8>) -> f64 {
     let y_fg = srgb_to_luminance(fg);
     let y_bg = srgb_to_luminance(bg);
 
+    let c = if y_bg > y_fg {
+        // Light background, dark text (positive contrast)
+        SCALE * (y_bg.powf(EXP_BG_LIGHT) - y_fg.powf(EXP_FG_LIGHT))
+    } else {
+        // Dark background, light text (negative contrast)
+        SCALE * (y_bg.powf(EXP_BG_DARK) - y_fg.powf(EXP_FG_DARK))
+    };
+
+    // Apply threshold and offset
+    if c.abs() < THRESHOLD {
+        0.0
+    } else if c > 0.0 {
+        (c - OFFSET) * 100.0
+    } else {
+        (c + OFFSET) * 100.0
+    }
+}
+
+/// Compute APCA contrast from pre-computed luminance values.
+/// Use when background luminance is fixed across many foreground evaluations.
+pub fn contrast_from_luminances(y_fg: f64, y_bg: f64) -> f64 {
     let c = if y_bg > y_fg {
         // Light background, dark text (positive contrast)
         SCALE * (y_bg.powf(EXP_BG_LIGHT) - y_fg.powf(EXP_FG_LIGHT))

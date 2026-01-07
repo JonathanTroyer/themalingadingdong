@@ -1,32 +1,40 @@
 //! TOML configuration file support for theme generation.
+//!
+//! Uses Figment for hierarchical configuration with layered overrides:
+//! `defaults < TOML file < CLI args`
 
 use std::path::Path;
+use std::str::FromStr;
 
+use csscolorparser::Color as CssColor;
+use figment::Figment;
+use figment::providers::{Format, Serialized, Toml};
+use palette::Srgb;
 use serde::{Deserialize, Serialize};
 
 use crate::curves::InterpolationConfig;
-use crate::generate::{GenerateConfig, parse_color};
+use crate::generate::GenerateConfig;
 
 /// Error type for configuration operations.
 #[derive(Debug)]
 pub enum ConfigError {
     /// IO error reading/writing file
     Io(std::io::Error),
-    /// TOML parsing error
-    Parse(toml::de::Error),
-    /// TOML serialization error
-    Serialize(toml::ser::Error),
+    /// Figment configuration error (boxed to reduce size)
+    Figment(Box<figment::Error>),
     /// Invalid color format
     InvalidColor(String),
+    /// Missing required field
+    MissingField(&'static str),
 }
 
 impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Io(e) => write!(f, "IO error: {}", e),
-            Self::Parse(e) => write!(f, "TOML parse error: {}", e),
-            Self::Serialize(e) => write!(f, "TOML serialize error: {}", e),
+            Self::Figment(e) => write!(f, "Configuration error: {}", e),
             Self::InvalidColor(s) => write!(f, "Invalid color: {}", s),
+            Self::MissingField(field) => write!(f, "Missing required field: {}", field),
         }
     }
 }
@@ -39,20 +47,42 @@ impl From<std::io::Error> for ConfigError {
     }
 }
 
-impl From<toml::de::Error> for ConfigError {
-    fn from(e: toml::de::Error) -> Self {
-        Self::Parse(e)
+impl From<figment::Error> for ConfigError {
+    fn from(e: figment::Error) -> Self {
+        Self::Figment(Box::new(e))
     }
 }
 
-impl From<toml::ser::Error> for ConfigError {
-    fn from(e: toml::ser::Error) -> Self {
-        Self::Serialize(e)
+/// Load configuration with Figment layering.
+///
+/// Priority: defaults < TOML file < CLI overrides
+pub fn load_config(
+    config_path: Option<&Path>,
+    cli_overrides: &ThemeConfig,
+) -> Result<ThemeConfig, ConfigError> {
+    let mut figment = Figment::new().merge(Serialized::defaults(ThemeConfig::default()));
+
+    if let Some(path) = config_path {
+        figment = figment.merge(Toml::file(path));
     }
+
+    figment = figment.merge(Serialized::defaults(cli_overrides));
+    Ok(figment.extract()?)
+}
+
+/// Validate that required fields are present in the configuration.
+pub fn validate_config(config: &ThemeConfig) -> Result<(), ConfigError> {
+    if config.colors.background.is_none() {
+        return Err(ConfigError::MissingField("colors.background"));
+    }
+    if config.colors.foreground.is_none() {
+        return Err(ConfigError::MissingField("colors.foreground"));
+    }
+    Ok(())
 }
 
 /// Root configuration structure for TOML files.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ThemeConfig {
     /// Theme metadata
@@ -63,6 +93,27 @@ pub struct ThemeConfig {
     pub curves: InterpolationConfig,
     /// Contrast settings
     pub contrast: ContrastConfig,
+    /// Accent optimization settings for main accents (base08-0F)
+    pub optimization: AccentOptSettings,
+    /// Accent optimization settings for extended accents (base10-17)
+    pub extended_optimization: AccentOptSettings,
+}
+
+impl Default for ThemeConfig {
+    fn default() -> Self {
+        Self {
+            theme: ThemeMetadata::default(),
+            colors: ColorConfig::default(),
+            curves: InterpolationConfig::default(),
+            contrast: ContrastConfig::default(),
+            optimization: AccentOptSettings::default(),
+            extended_optimization: AccentOptSettings {
+                target_j: 70.0,
+                target_m: 35.0,
+                ..AccentOptSettings::default()
+            },
+        }
+    }
 }
 
 /// Theme metadata.
@@ -70,10 +121,13 @@ pub struct ThemeConfig {
 #[serde(default)]
 pub struct ThemeMetadata {
     /// Name of the theme
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub name: String,
     /// Author of the theme
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
     /// Variant hint (dark, light, auto)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variant: Option<String>,
 }
 
@@ -82,16 +136,13 @@ pub struct ThemeMetadata {
 #[serde(default)]
 pub struct ColorConfig {
     /// Background color (any CSS color format)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
     /// Foreground color (any CSS color format)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub foreground: Option<String>,
-    /// Colorfulness for accent colors (HellwigJmh M, 0-50 typical)
-    #[serde(alias = "accent_chroma")]
-    pub accent_colorfulness: Option<f32>,
-    /// Colorfulness for extended accent colors (HellwigJmh M, 0-50 typical)
-    #[serde(alias = "extended_chroma")]
-    pub extended_colorfulness: Option<f32>,
     /// Hue overrides for accent colors
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hue_overrides: Option<HueOverrides>,
 }
 
@@ -100,20 +151,28 @@ pub struct ColorConfig {
 #[serde(default)]
 pub struct HueOverrides {
     /// base08 (Red) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base08: Option<f32>,
     /// base09 (Orange) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base09: Option<f32>,
     /// base0A (Yellow) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0a: Option<f32>,
     /// base0B (Green) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0b: Option<f32>,
     /// base0C (Cyan) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0c: Option<f32>,
     /// base0D (Blue) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0d: Option<f32>,
     /// base0E (Purple) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0e: Option<f32>,
     /// base0F (Magenta) hue in degrees
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base0f: Option<f32>,
 }
 
@@ -174,17 +233,42 @@ impl Default for ContrastConfig {
     }
 }
 
-impl ThemeConfig {
-    /// Load configuration from a TOML file.
-    pub fn load(path: &Path) -> Result<Self, ConfigError> {
-        let content = std::fs::read_to_string(path)?;
-        let config: Self = toml::from_str(&content)?;
-        Ok(config)
-    }
+/// Accent color optimization settings for COBYLA solver.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AccentOptSettings {
+    /// Target lightness (J') for accent colors
+    pub target_j: f32,
+    /// Target colorfulness (M) for accent colors
+    pub target_m: f32,
+    /// Maximum deviation from target_j (box constraint)
+    pub delta_j: f32,
+    /// Maximum deviation from target_m (box constraint)
+    pub delta_m: f32,
+    /// Weight for J vs M uniformity (0.0=M priority, 1.0=J priority)
+    pub j_weight: f32,
+    /// Weight for contrast vs uniformity (0.0=uniformity, 1.0=contrast)
+    pub contrast_weight: f32,
+}
 
+impl Default for AccentOptSettings {
+    fn default() -> Self {
+        Self {
+            target_j: 80.0,
+            target_m: 25.0,
+            delta_j: 3.0,
+            delta_m: 6.0,
+            j_weight: 0.75,
+            contrast_weight: 0.8,
+        }
+    }
+}
+
+impl ThemeConfig {
     /// Save configuration to a TOML file.
     pub fn save(&self, path: &Path) -> Result<(), ConfigError> {
-        let content = toml::to_string_pretty(self)?;
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| ConfigError::Figment(Box::new(figment::Error::from(e.to_string()))))?;
         std::fs::write(path, content)?;
         Ok(())
     }
@@ -221,14 +305,6 @@ impl ThemeConfig {
             min_contrast: self.contrast.minimum,
             extended_min_contrast: self.contrast.extended_minimum,
             max_lightness_adjustment: self.contrast.max_adjustment,
-            accent_colorfulness: self
-                .colors
-                .accent_colorfulness
-                .unwrap_or(defaults.accent_colorfulness),
-            extended_colorfulness: self
-                .colors
-                .extended_colorfulness
-                .unwrap_or(defaults.extended_colorfulness),
             name: if self.theme.name.is_empty() {
                 defaults.name
             } else {
@@ -236,6 +312,8 @@ impl ThemeConfig {
             },
             author: self.theme.author.clone(),
             interpolation: self.curves.clone(),
+            accent_opt: self.optimization.clone(),
+            extended_accent_opt: self.extended_optimization.clone(),
         })
     }
 
@@ -256,8 +334,6 @@ impl ThemeConfig {
                     "#{:02x}{:02x}{:02x}",
                     config.foreground.red, config.foreground.green, config.foreground.blue
                 )),
-                accent_colorfulness: Some(config.accent_colorfulness),
-                extended_colorfulness: Some(config.extended_colorfulness),
                 hue_overrides: Some(HueOverrides::from_array(config.hue_overrides)),
             },
             curves: config.interpolation.clone(),
@@ -266,6 +342,27 @@ impl ThemeConfig {
                 extended_minimum: config.extended_min_contrast,
                 max_adjustment: config.max_lightness_adjustment,
             },
+            optimization: config.accent_opt.clone(),
+            extended_optimization: config.extended_accent_opt.clone(),
         }
     }
+}
+
+/// Parse any CSS color string into Srgb<u8>.
+///
+/// Supports: hex (#RRGGBB), rgb(), oklch(), named colors, etc.
+pub fn parse_color(input: &str) -> Result<Srgb<u8>, String> {
+    let css_color: CssColor = input
+        .parse()
+        .map_err(|e| format!("Invalid color '{}': {}", input, e))?;
+    let [r, g, b, _a] = css_color.to_rgba8();
+    Ok(Srgb::new(r, g, b))
+}
+
+/// Parse a hex color string into an Srgb<u8>.
+#[deprecated(note = "Use parse_color() instead which supports more formats")]
+pub fn parse_hex(hex: &str) -> Result<Srgb<u8>, String> {
+    // palette's FromStr expects 6 hex chars without #
+    let hex = hex.trim_start_matches('#');
+    Srgb::from_str(hex).map_err(|e| format!("Invalid hex color: {e}"))
 }

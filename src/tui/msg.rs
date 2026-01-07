@@ -9,15 +9,10 @@ pub enum Msg {
     // Application control
     Quit,
     ShowHelp,
-    HideHelp,
-    ShowExport,
-    HideExport,
 
     // Focus/Navigation
     FocusNext,
     FocusPrev,
-    FocusUp,
-    FocusDown,
 
     // Background HellwigJmh changes (J', M, h)
     BackgroundJChanged(f32),
@@ -32,8 +27,6 @@ pub enum Msg {
     // Numeric parameter changes
     MinContrastChanged(f64),
     ExtendedMinContrastChanged(f64),
-    AccentColorfulnessChanged(f32),
-    ExtendedColorfulnessChanged(f32),
 
     // Selection changes
     VariantChanged(VariantArg),
@@ -46,6 +39,20 @@ pub enum Msg {
 
     // Hue override changes (index 0-7)
     HueOverrideChanged(u8, Option<f32>),
+
+    // Accent optimization changes
+    AccentTargetJChanged(f32),
+    AccentDeltaJChanged(f32),
+    AccentTargetMChanged(f32),
+    AccentDeltaMChanged(f32),
+    ExtendedTargetJChanged(f32),
+    ExtendedDeltaJChanged(f32),
+    ExtendedTargetMChanged(f32),
+    ExtendedDeltaMChanged(f32),
+
+    // Optimization weight changes
+    ContrastWeightChanged(f32),
+    JWeightChanged(f32),
 
     // Metadata changes
     NameChanged(String),
@@ -63,7 +70,4 @@ pub enum Msg {
     // Validation scroll
     ValidationScrollUp,
     ValidationScrollDown,
-
-    // No-op (for unhandled events)
-    None,
 }

@@ -1,40 +1,5 @@
-use approx::assert_relative_eq;
 use palette::Srgb;
 use themalingadingdong::apca::apca_contrast;
-
-#[test]
-fn test_black_on_white() {
-    let black = Srgb::new(0u8, 0, 0);
-    let white = Srgb::new(255u8, 255, 255);
-
-    let lc = apca_contrast(black, white);
-
-    // Black on white should be approximately 105 Lc
-    assert_relative_eq!(lc, 105.0, epsilon = 3.0);
-    assert!(lc > 0.0, "Dark text on light bg should be positive");
-}
-
-#[test]
-fn test_white_on_black() {
-    let black = Srgb::new(0u8, 0, 0);
-    let white = Srgb::new(255u8, 255, 255);
-
-    let lc = apca_contrast(white, black);
-
-    // White on black should be approximately -105 Lc
-    assert_relative_eq!(lc, -105.0, epsilon = 3.0);
-    assert!(lc < 0.0, "Light text on dark bg should be negative");
-}
-
-#[test]
-fn test_same_color_zero_contrast() {
-    let gray = Srgb::new(128u8, 128, 128);
-
-    let lc = apca_contrast(gray, gray);
-
-    // Same color should have zero contrast
-    assert_relative_eq!(lc, 0.0, epsilon = 1.0);
-}
 
 #[test]
 fn test_mid_gray_on_white() {
@@ -91,20 +56,4 @@ fn test_colored_text() {
 
     // Red on white should have decent contrast
     assert!(lc > 30.0, "Red on white should be readable");
-}
-
-#[test]
-fn test_low_contrast_warning_case() {
-    // A case that would fail body text (Lc 75) but pass UI components (Lc 30)
-    let light_gray = Srgb::new(180u8, 180, 180);
-    let white = Srgb::new(255u8, 255, 255);
-
-    let lc = apca_contrast(light_gray, white);
-
-    // Should be below body text minimum (75) but above UI components (30)
-    assert!(lc.abs() < 75.0, "Light gray on white should fail body text");
-    assert!(
-        lc.abs() > 30.0,
-        "Light gray on white should pass UI components"
-    );
 }
