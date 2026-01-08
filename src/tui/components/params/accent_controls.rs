@@ -134,7 +134,7 @@ impl AccentControls {
     fn draw_slider(&self, frame: &mut Frame, params: SliderParams) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(15), Constraint::Min(10)])
+            .constraints([Constraint::Length(17), Constraint::Min(10)])
             .split(params.area);
 
         let label_style = if params.focused {
@@ -210,10 +210,10 @@ impl MockComponent for AccentControls {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1), // Min contrast
-                Constraint::Length(1), // Target J'
-                Constraint::Length(1), // Delta J'
-                Constraint::Length(1), // Target M
-                Constraint::Length(1), // Delta M
+                Constraint::Length(1), // Target lightness
+                Constraint::Length(1), // Delta lightness
+                Constraint::Length(1), // Target colorfulness
+                Constraint::Length(1), // Delta colorfulness
             ])
             .split(area);
 
@@ -234,7 +234,7 @@ impl MockComponent for AccentControls {
             frame,
             SliderParams {
                 area: rows[1],
-                label: "  Target J'",
+                label: "  Tgt Lightness",
                 value: f64::from(self.values.target_j),
                 min: 20.0,
                 max: 95.0,
@@ -247,7 +247,7 @@ impl MockComponent for AccentControls {
             frame,
             SliderParams {
                 area: rows[2],
-                label: "  Delta J'",
+                label: "  Δ Lightness",
                 value: f64::from(self.values.delta_j),
                 min: 1.0,
                 max: 30.0,
@@ -260,7 +260,7 @@ impl MockComponent for AccentControls {
             frame,
             SliderParams {
                 area: rows[3],
-                label: "  Target M",
+                label: "  Tgt Colorful",
                 value: f64::from(self.values.target_m),
                 min: 5.0,
                 max: 50.0,
@@ -273,7 +273,7 @@ impl MockComponent for AccentControls {
             frame,
             SliderParams {
                 area: rows[4],
-                label: "  Delta M",
+                label: "  Δ Colorful",
                 value: f64::from(self.values.delta_m),
                 min: 1.0,
                 max: 25.0,

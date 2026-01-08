@@ -44,7 +44,7 @@ impl WeightFocus {
 pub struct WeightValues {
     /// Contrast weight (Lc), range 0-1
     pub contrast_weight: f32,
-    /// Uniformity weight (J'), range 0-1
+    /// Lightness uniformity weight, range 0-1
     pub j_weight: f32,
 }
 
@@ -78,7 +78,7 @@ impl WeightControls {
     fn draw_slider(&self, frame: &mut Frame, area: Rect, label: &str, value: f32, focused: bool) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(15), Constraint::Min(10)])
+            .constraints([Constraint::Length(17), Constraint::Min(10)])
             .split(area);
 
         let label_style = if focused {
@@ -145,8 +145,8 @@ impl MockComponent for WeightControls {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // Lc Weight
-                Constraint::Length(1), // J Weight
+                Constraint::Length(1), // Contrast weight
+                Constraint::Length(1), // Lightness weight
             ])
             .split(area);
 
@@ -161,7 +161,7 @@ impl MockComponent for WeightControls {
         self.draw_slider(
             frame,
             rows[1],
-            "J Weight",
+            "Lightness Wt",
             self.values.j_weight,
             focused && self.sub_focus == WeightFocus::JWeight,
         );

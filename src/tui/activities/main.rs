@@ -422,35 +422,19 @@ impl Activity for MainActivity {
             let params_inner = params_block.inner(params_area);
             frame.render_widget(params_block, params_area);
 
-            // Calculate curve controls height (3 type rows + conditional strength rows)
-            let curve_height =
-                3 + if model.interpolation.lightness.curve_type.uses_strength() {
-                    1
-                } else {
-                    0
-                } + if model.interpolation.chroma.curve_type.uses_strength() {
-                    1
-                } else {
-                    0
-                } + if model.interpolation.hue.curve_type.uses_strength() {
-                    1
-                } else {
-                    0
-                };
-
             let param_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(3),            // 0: Background picker (J/M/h)
-                    Constraint::Length(3),            // 1: Foreground picker (J/M/h)
-                    Constraint::Length(1),            // 2: Spacer
-                    Constraint::Length(curve_height), // 3: Curve controls (grouped)
-                    Constraint::Length(2),            // 4: Weight controls (grouped)
-                    Constraint::Length(1),            // 5: Spacer
-                    Constraint::Length(5),            // 6: Accent controls (grouped)
-                    Constraint::Length(5),            // 7: Extended accent controls (grouped)
-                    Constraint::Length(1),            // 8: Spacer
-                    Constraint::Length(3),            // 9: Hue overrides
+                    Constraint::Length(4), // 0: Background picker (header + J/M/h)
+                    Constraint::Length(4), // 1: Foreground picker (header + J/M/h)
+                    Constraint::Length(1), // 2: Spacer
+                    Constraint::Length(3), // 3: Curve controls (3 rows, inline strength)
+                    Constraint::Length(2), // 4: Weight controls (grouped)
+                    Constraint::Length(1), // 5: Spacer
+                    Constraint::Length(5), // 6: Accent controls (grouped)
+                    Constraint::Length(5), // 7: Extended accent controls (grouped)
+                    Constraint::Length(1), // 8: Spacer
+                    Constraint::Length(3), // 9: Hue overrides
                     Constraint::Min(0),
                 ])
                 .split(params_inner);

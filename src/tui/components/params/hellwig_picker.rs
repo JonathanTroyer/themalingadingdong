@@ -165,7 +165,7 @@ impl HellwigPicker {
     ) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(15), Constraint::Min(10)])
+            .constraints([Constraint::Length(17), Constraint::Min(10)])
             .split(area);
 
         let label_style = if focused {
@@ -238,23 +238,49 @@ impl MockComponent for HellwigPicker {
             .get_or(Attribute::Focus, AttrValue::Flag(false))
             .unwrap_flag();
 
-        // Split into 3 rows for J, M, h
+        // Split into 4 rows: header + lightness, colorfulness, hue
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
+                Constraint::Length(1), // Header with label and swatch
+                Constraint::Length(1), // Lightness
+                Constraint::Length(1), // Colorfulness
+                Constraint::Length(1), // Hue
             ])
             .split(area);
 
-        let warning = if self.values.out_of_gamut { " !" } else { "" };
+        // Header row with label, warning, and color swatch
+        let header_cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(10), Constraint::Length(3)])
+            .split(rows[0]);
 
-        // Lightness (J')
+        let warning = if self.values.out_of_gamut { " !" } else { "" };
+        let header_style = if focused {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().add_modifier(Modifier::BOLD)
+        };
+        let header_text =
+            Paragraph::new(format!("{}:{}", self.label(), warning)).style(header_style);
+        frame.render_widget(header_text, header_cols[0]);
+
+        // Color swatch in header
+        let swatch_style = Style::default().bg(Color::Rgb(
+            self.srgb_preview.red,
+            self.srgb_preview.green,
+            self.srgb_preview.blue,
+        ));
+        let swatch = Paragraph::new("   ").style(swatch_style);
+        frame.render_widget(swatch, header_cols[1]);
+
+        // Lightness slider
         self.draw_slider(
             frame,
-            rows[0],
-            &format!("{} J{}", self.label(), warning),
+            rows[1],
+            "  Lightness",
             self.values.lightness,
             0.0,
             100.0,
@@ -262,11 +288,11 @@ impl MockComponent for HellwigPicker {
             false,
         );
 
-        // Colorfulness (M)
+        // Colorfulness slider
         self.draw_slider(
             frame,
-            rows[1],
-            "  M",
+            rows[2],
+            "  Colorfulness",
             self.values.colorfulness,
             0.0,
             105.0,
@@ -274,31 +300,17 @@ impl MockComponent for HellwigPicker {
             false,
         );
 
-        // Hue with color swatch
-        let hue_cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(10), Constraint::Length(3)])
-            .split(rows[2]);
-
+        // Hue slider
         self.draw_slider(
             frame,
-            hue_cols[0],
-            "  h",
+            rows[3],
+            "  Hue",
             self.values.hue,
             0.0,
             360.0,
             focused && self.sub_focus == HellwigFocus::Hue,
             true,
         );
-
-        // Color swatch
-        let swatch_style = Style::default().bg(Color::Rgb(
-            self.srgb_preview.red,
-            self.srgb_preview.green,
-            self.srgb_preview.blue,
-        ));
-        let swatch = Paragraph::new("   ").style(swatch_style);
-        frame.render_widget(swatch, hue_cols[1]);
     }
 
     fn query(&self, attr: Attribute) -> Option<AttrValue> {

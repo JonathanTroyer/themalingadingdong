@@ -1,4 +1,4 @@
-//! Grouped curve controls component for J/M/h interpolation.
+//! Grouped curve controls component for lightness/colorfulness/hue interpolation.
 
 use crate::tui::AppAction;
 use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
@@ -32,18 +32,6 @@ pub enum CurveFocus {
 }
 
 impl CurveFocus {
-    /// Get all possible focus values in order.
-    fn all() -> &'static [CurveFocus] {
-        &[
-            Self::JType,
-            Self::JStrength,
-            Self::MType,
-            Self::MStrength,
-            Self::HType,
-            Self::HStrength,
-        ]
-    }
-
     /// Whether this focus is a strength slider.
     fn is_strength(self) -> bool {
         matches!(self, Self::JStrength | Self::MStrength | Self::HStrength)
@@ -87,41 +75,48 @@ impl CurveControls {
         }
     }
 
-    /// Get visible focus items based on current curve types.
-    fn visible_focuses(&self) -> Vec<CurveFocus> {
-        CurveFocus::all()
-            .iter()
-            .copied()
-            .filter(|f| self.is_strength_visible(*f))
-            .collect()
-    }
-
     /// Move to next visible focus.
     fn focus_next(&mut self) {
-        let visible = self.visible_focuses();
-        if visible.is_empty() {
-            return;
+        let order = [
+            CurveFocus::JType,
+            CurveFocus::JStrength,
+            CurveFocus::MType,
+            CurveFocus::MStrength,
+            CurveFocus::HType,
+            CurveFocus::HStrength,
+        ];
+        let current_idx = order.iter().position(|&f| f == self.sub_focus).unwrap_or(0);
+
+        for i in 1..=order.len() {
+            let next_idx = (current_idx + i) % order.len();
+            let candidate = order[next_idx];
+            if self.is_strength_visible(candidate) {
+                self.sub_focus = candidate;
+                return;
+            }
         }
-        let current_idx = visible
-            .iter()
-            .position(|&f| f == self.sub_focus)
-            .unwrap_or(0);
-        let next_idx = (current_idx + 1) % visible.len();
-        self.sub_focus = visible[next_idx];
     }
 
     /// Move to previous visible focus.
     fn focus_prev(&mut self) {
-        let visible = self.visible_focuses();
-        if visible.is_empty() {
-            return;
+        let order = [
+            CurveFocus::JType,
+            CurveFocus::JStrength,
+            CurveFocus::MType,
+            CurveFocus::MStrength,
+            CurveFocus::HType,
+            CurveFocus::HStrength,
+        ];
+        let current_idx = order.iter().position(|&f| f == self.sub_focus).unwrap_or(0);
+
+        for i in 1..=order.len() {
+            let prev_idx = (current_idx + order.len() - i) % order.len();
+            let candidate = order[prev_idx];
+            if self.is_strength_visible(candidate) {
+                self.sub_focus = candidate;
+                return;
+            }
         }
-        let current_idx = visible
-            .iter()
-            .position(|&f| f == self.sub_focus)
-            .unwrap_or(0);
-        let prev_idx = (current_idx + visible.len() - 1) % visible.len();
-        self.sub_focus = visible[prev_idx];
     }
 
     /// Cycle the curve type at current focus.
@@ -177,20 +172,35 @@ impl CurveControls {
         }
     }
 
-    fn draw_type_selector(
+    /// Draw a single curve row with type selector and optional inline strength slider.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_curve_row(
         &self,
         frame: &mut Frame,
         area: Rect,
         label: &str,
         curve_type: CurveType,
+        strength: f32,
+        type_focus: CurveFocus,
+        strength_focus: CurveFocus,
         focused: bool,
     ) {
+        let type_focused = focused && self.sub_focus == type_focus;
+        let strength_focused = focused && self.sub_focus == strength_focus;
+        let shows_strength = curve_type.uses_strength();
+
+        // Layout: Label (17) | Type selector (14) | Strength slider (rest)
         let cols = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(15), Constraint::Min(10)])
+            .constraints([
+                Constraint::Length(17),
+                Constraint::Length(14),
+                Constraint::Min(8),
+            ])
             .split(area);
 
-        let label_style = if focused {
+        // Label
+        let label_style = if type_focused || strength_focused {
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD)
@@ -200,12 +210,13 @@ impl CurveControls {
         let label_text = Paragraph::new(format!("{}:", label)).style(label_style);
         frame.render_widget(label_text, cols[0]);
 
-        let value_style = if focused {
+        // Type selector
+        let value_style = if type_focused {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default()
         };
-        let arrow_style = if focused {
+        let arrow_style = if type_focused {
             Style::default().fg(Color::DarkGray)
         } else {
             Style::default()
@@ -213,33 +224,27 @@ impl CurveControls {
                 .add_modifier(Modifier::DIM)
         };
 
-        let line = Line::from(vec![
+        let type_line = Line::from(vec![
             Span::styled("◂ ", arrow_style),
             Span::styled(curve_type.display_name(), value_style),
             Span::styled(" ▸", arrow_style),
         ]);
+        let type_para = Paragraph::new(type_line);
+        frame.render_widget(type_para, cols[1]);
 
-        let value_para = Paragraph::new(line);
-        frame.render_widget(value_para, cols[1]);
+        // Strength slider (only if curve type uses strength)
+        if shows_strength {
+            self.draw_inline_strength(frame, cols[2], strength, strength_focused);
+        }
     }
 
-    fn draw_strength_slider(&self, frame: &mut Frame, area: Rect, value: f32, focused: bool) {
-        let cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(15), Constraint::Min(10)])
-            .split(area);
+    /// Draw an inline strength slider.
+    fn draw_inline_strength(&self, frame: &mut Frame, area: Rect, value: f32, focused: bool) {
+        let slider_width = area.width.saturating_sub(6) as usize;
+        if slider_width == 0 {
+            return;
+        }
 
-        let label_style = if focused {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-        };
-        let label_text = Paragraph::new("  Strength:").style(label_style);
-        frame.render_widget(label_text, cols[0]);
-
-        let slider_width = cols[1].width.saturating_sub(8) as usize;
         // Map 0.1-5.0 to 0-1 for display
         let ratio = (f64::from(value) - 0.1) / (5.0 - 0.1);
         let pos = (ratio * slider_width as f64).round() as usize;
@@ -270,7 +275,7 @@ impl CurveControls {
             }
         }
 
-        let value_str = format!(" {:.2}", value);
+        let value_str = format!(" {:.1}", value);
         spans.push(Span::styled(
             value_str,
             if focused {
@@ -281,7 +286,7 @@ impl CurveControls {
         ));
 
         let slider_line = Paragraph::new(Line::from(spans));
-        frame.render_widget(slider_line, cols[1]);
+        frame.render_widget(slider_line, area);
     }
 }
 
@@ -292,86 +297,51 @@ impl MockComponent for CurveControls {
             .get_or(Attribute::Focus, AttrValue::Flag(false))
             .unwrap_flag();
 
-        // Calculate how many rows we need based on visibility
-        let j_strength_visible = self.values.j_type.uses_strength();
-        let m_strength_visible = self.values.m_type.uses_strength();
-        let h_strength_visible = self.values.h_type.uses_strength();
-
-        let row_count = 3 // J, M, h type selectors
-            + if j_strength_visible { 1 } else { 0 }
-            + if m_strength_visible { 1 } else { 0 }
-            + if h_strength_visible { 1 } else { 0 };
-
-        let constraints: Vec<Constraint> = (0..row_count).map(|_| Constraint::Length(1)).collect();
-
+        // Fixed 3 rows - one per curve type
         let rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(constraints)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
             .split(area);
 
-        let mut row_idx = 0;
-
-        // J curve type
-        self.draw_type_selector(
+        // Lightness curve
+        self.draw_curve_row(
             frame,
-            rows[row_idx],
-            "J Curve",
+            rows[0],
+            "Lightness Crv",
             self.values.j_type,
-            focused && self.sub_focus == CurveFocus::JType,
+            self.values.j_strength,
+            CurveFocus::JType,
+            CurveFocus::JStrength,
+            focused,
         );
-        row_idx += 1;
 
-        // J strength (if visible)
-        if j_strength_visible {
-            self.draw_strength_slider(
-                frame,
-                rows[row_idx],
-                self.values.j_strength,
-                focused && self.sub_focus == CurveFocus::JStrength,
-            );
-            row_idx += 1;
-        }
-
-        // M curve type
-        self.draw_type_selector(
+        // Colorfulness curve
+        self.draw_curve_row(
             frame,
-            rows[row_idx],
-            "M Curve",
+            rows[1],
+            "Colorful Crv",
             self.values.m_type,
-            focused && self.sub_focus == CurveFocus::MType,
+            self.values.m_strength,
+            CurveFocus::MType,
+            CurveFocus::MStrength,
+            focused,
         );
-        row_idx += 1;
 
-        // M strength (if visible)
-        if m_strength_visible {
-            self.draw_strength_slider(
-                frame,
-                rows[row_idx],
-                self.values.m_strength,
-                focused && self.sub_focus == CurveFocus::MStrength,
-            );
-            row_idx += 1;
-        }
-
-        // h curve type
-        self.draw_type_selector(
+        // Hue curve
+        self.draw_curve_row(
             frame,
-            rows[row_idx],
-            "h Curve",
+            rows[2],
+            "Hue Curve",
             self.values.h_type,
-            focused && self.sub_focus == CurveFocus::HType,
+            self.values.h_strength,
+            CurveFocus::HType,
+            CurveFocus::HStrength,
+            focused,
         );
-        row_idx += 1;
-
-        // h strength (if visible)
-        if h_strength_visible && row_idx < rows.len() {
-            self.draw_strength_slider(
-                frame,
-                rows[row_idx],
-                self.values.h_strength,
-                focused && self.sub_focus == CurveFocus::HStrength,
-            );
-        }
     }
 
     fn query(&self, attr: Attribute) -> Option<AttrValue> {
