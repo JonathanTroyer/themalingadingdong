@@ -1,5 +1,6 @@
 //! HellwigJmh color picker Component with J/M/h sliders.
 
+use crate::tui::AppAction;
 use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use palette::Srgb;
 use ratatui::Frame;
@@ -16,8 +17,8 @@ use tuirealm::{
 };
 
 use crate::hellwig::HellwigJmh;
-use crate::tui::msg::Msg;
-use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
+use crate::tui::activities::{Msg, main::UserEvent};
+use crate::tui::{dispatcher, handle_global_app_events};
 
 /// Which slider is focused within the picker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -365,26 +366,26 @@ impl Component<Msg, UserEvent> for HellwigPicker {
 
         match action {
             // Focus navigation
-            TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
-            TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Next)) => Some(Msg::FocusNext),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Prev)) => Some(Msg::FocusPrev),
 
             // Navigation within picker
-            TuiEvent::Navigation(NavigationEvent::Up) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Up)) => {
                 self.perform(Cmd::Move(CmdDirection::Up));
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Down) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Down)) => {
                 self.perform(Cmd::Move(CmdDirection::Down));
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Left) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Left)) => {
                 if let CmdResult::Changed(_) = self.perform(Cmd::Move(CmdDirection::Left)) {
                     self.msg_for_change()
                 } else {
                     None
                 }
             }
-            TuiEvent::Navigation(NavigationEvent::Right) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Right)) => {
                 if let CmdResult::Changed(_) = self.perform(Cmd::Move(CmdDirection::Right)) {
                     self.msg_for_change()
                 } else {

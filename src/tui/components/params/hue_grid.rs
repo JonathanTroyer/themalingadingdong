@@ -1,5 +1,6 @@
 //! Hue overrides grid Component with 8 hue sliders.
 
+use crate::tui::AppAction;
 use crossterm_actions::{InputEvent, NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
@@ -15,8 +16,8 @@ use tuirealm::{
 };
 
 use crate::interpolation::DEFAULT_BASE16_HUES;
-use crate::tui::msg::Msg;
-use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
+use crate::tui::activities::{Msg, main::UserEvent};
+use crate::tui::{dispatcher, handle_global_app_events};
 
 /// Hue color names.
 const HUE_NAMES: [&str; 8] = [
@@ -290,38 +291,38 @@ impl Component<Msg, UserEvent> for HueGrid {
 
         match action {
             // Enter starts editing with current value pre-filled
-            TuiEvent::Input(InputEvent::Confirm) => {
+            AppAction::Tui(TuiEvent::Input(InputEvent::Confirm)) => {
                 self.start_editing();
                 None
             }
 
             // Tab bubbles up for component navigation
-            TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
-            TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Next)) => Some(Msg::FocusNext),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Prev)) => Some(Msg::FocusPrev),
 
             // Grid navigation: arrows move between cells
-            TuiEvent::Navigation(NavigationEvent::Up) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Up)) => {
                 if self.selected >= 4 {
                     // Move up a row
                     self.selected -= 4;
                 }
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Down) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Down)) => {
                 if self.selected < 4 {
                     // Move down a row
                     self.selected += 4;
                 }
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Left) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Left)) => {
                 // Move to previous cell in row, wrap to previous row
                 if self.selected > 0 {
                     self.selected -= 1;
                 }
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Right) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Right)) => {
                 // Move to next cell in row, wrap to next row
                 if self.selected < 7 {
                     self.selected += 1;

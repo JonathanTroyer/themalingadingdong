@@ -16,8 +16,7 @@ use tuirealm::{
 };
 
 use crate::curves::{CurveConfig, compute_sample_positions};
-use crate::tui::UserEvent;
-use crate::tui::msg::Msg;
+use crate::tui::activities::{Msg, main::UserEvent};
 
 /// Color names in Base24 order.
 const COLOR_NAMES: [&str; 24] = [

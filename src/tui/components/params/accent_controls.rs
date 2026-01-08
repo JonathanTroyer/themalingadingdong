@@ -1,5 +1,6 @@
 //! Grouped accent color controls component.
 
+use crate::tui::AppAction;
 use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
@@ -14,8 +15,8 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::msg::Msg;
-use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
+use crate::tui::activities::{Msg, main::UserEvent};
+use crate::tui::{dispatcher, handle_global_app_events};
 
 /// Which control is focused within the accent group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -339,24 +340,24 @@ impl Component<Msg, UserEvent> for AccentControls {
         }
 
         match action {
-            TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
-            TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
-            TuiEvent::Navigation(NavigationEvent::Up) => {
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Next)) => Some(Msg::FocusNext),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Prev)) => Some(Msg::FocusPrev),
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Up)) => {
                 self.perform(Cmd::Move(CmdDirection::Up));
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Down) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Down)) => {
                 self.perform(Cmd::Move(CmdDirection::Down));
                 None
             }
-            TuiEvent::Navigation(NavigationEvent::Left) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Left)) => {
                 if let CmdResult::Changed(_) = self.perform(Cmd::Move(CmdDirection::Left)) {
                     self.msg_for_change()
                 } else {
                     None
                 }
             }
-            TuiEvent::Navigation(NavigationEvent::Right) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Right)) => {
                 if let CmdResult::Changed(_) = self.perform(Cmd::Move(CmdDirection::Right)) {
                     self.msg_for_change()
                 } else {

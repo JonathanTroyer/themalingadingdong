@@ -1,5 +1,6 @@
 //! Validation results Component.
 
+use crate::tui::AppAction;
 use crossterm_actions::{NavigationEvent, SelectionEvent, TuiEvent};
 use ratatui::Frame;
 use ratatui::{
@@ -14,8 +15,8 @@ use tuirealm::{
     props::{AttrValue, Attribute, Props},
 };
 
-use crate::tui::msg::Msg;
-use crate::tui::{UserEvent, dispatcher, handle_global_app_events};
+use crate::tui::activities::{Msg, main::UserEvent};
+use crate::tui::{dispatcher, handle_global_app_events};
 use crate::validation::{ValidationResult, ValidationResults};
 
 /// Validation results display with scrolling.
@@ -382,15 +383,15 @@ impl Component<Msg, UserEvent> for Validation {
 
         match action {
             // Focus navigation
-            TuiEvent::Selection(SelectionEvent::Next) => Some(Msg::FocusNext),
-            TuiEvent::Selection(SelectionEvent::Prev) => Some(Msg::FocusPrev),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Next)) => Some(Msg::FocusNext),
+            AppAction::Tui(TuiEvent::Selection(SelectionEvent::Prev)) => Some(Msg::FocusPrev),
 
             // Scrolling
-            TuiEvent::Navigation(NavigationEvent::Up) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Up)) => {
                 self.perform(Cmd::Scroll(CmdDirection::Up));
                 Some(Msg::ValidationScrollUp)
             }
-            TuiEvent::Navigation(NavigationEvent::Down) => {
+            AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Down)) => {
                 self.perform(Cmd::Scroll(CmdDirection::Down));
                 Some(Msg::ValidationScrollDown)
             }

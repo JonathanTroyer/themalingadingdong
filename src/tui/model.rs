@@ -14,7 +14,7 @@ use crate::generate::{GenerateConfig, generate_for_variant, parse_color};
 use crate::hellwig::HellwigJmh;
 use crate::validation::{ValidationResults, validate_with_accent_data};
 
-use super::msg::Msg;
+use super::activities::Msg;
 
 /// HellwigJmh color components for editing.
 #[derive(Debug, Clone, Copy)]
@@ -88,6 +88,7 @@ pub struct Model {
 
     // UI state
     pub quit: bool,
+    pub show_help: bool,
     pub message: Option<String>,
     pub export_path: String,
 }
@@ -160,6 +161,7 @@ impl Model {
             validation_results: None,
 
             quit: false,
+            show_help: false,
             message: None,
             export_path: String::from("scheme.yaml"),
         })
@@ -400,12 +402,22 @@ impl Update<Msg> for Model {
                 None
             }
 
+            // Help modal
+            Msg::ShowHelp => {
+                self.show_help = true;
+                None
+            }
+            Msg::HideHelp => {
+                self.show_help = false;
+                None
+            }
+
             // These messages don't need model updates
-            Msg::ShowHelp
-            | Msg::FocusNext
+            Msg::FocusNext
             | Msg::FocusPrev
             | Msg::ValidationScrollUp
-            | Msg::ValidationScrollDown => None,
+            | Msg::ValidationScrollDown
+            | Msg::SwitchToCodePreview => None,
         }
     }
 }
