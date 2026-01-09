@@ -1,4 +1,4 @@
-//! Build script for compile-time LUT generation.
+//! Build script for compile-time LUT and man page generation.
 //!
 //! Generates lookup tables into src/generated/ for:
 //! - GAMMA_LUT: sRGB gamma decompression
@@ -6,6 +6,8 @@
 //! - ECCENTRICITY_CAM16_LUT: CAM16 eccentricity
 //! - HK_HUE_LUT: Helmholtz-Kohlrausch hue dependency
 //! - CUSP_LUT: Gamut boundary cusps (J', M) per hue
+//!
+//! Also generates man page via clap_mangen.
 
 use std::f64::consts::PI;
 use std::fs;
@@ -17,8 +19,12 @@ use palette::convert::IntoColorUnclamped;
 use palette::white_point::D65;
 use palette::{Srgb, Xyz};
 
+#[path = "src/cli_args.rs"]
+mod cli_args;
+
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/cli_args.rs");
 
     let out_dir = Path::new("src/generated");
     fs::create_dir_all(out_dir).expect("Failed to create src/generated directory");
@@ -29,6 +35,7 @@ fn main() {
     generate_hk_hue_lut(out_dir);
     generate_cusp_lut(out_dir);
     generate_mod_rs(out_dir);
+    generate_man_page();
 }
 
 /// Generate GAMMA_LUT: 256-entry [f64; 256] for (x/255.0)^2.4 (u8 inputs)
@@ -306,4 +313,21 @@ fn generate_cusp_lut(out_dir: &Path) {
     }
 
     writeln!(file, "];").unwrap();
+}
+
+/// Generate man page using clap_mangen
+fn generate_man_page() {
+    use clap::CommandFactory;
+    use clap_mangen::Man;
+
+    let out_dir =
+        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string()));
+    let man_dir = out_dir.join("man");
+    fs::create_dir_all(&man_dir).expect("Failed to create man directory");
+
+    let cmd = cli_args::Cli::command();
+    let man = Man::new(cmd);
+    let mut buffer = Vec::new();
+    man.render(&mut buffer).expect("Failed to render man page");
+    fs::write(man_dir.join("themalingadingdong.1"), buffer).expect("Failed to write man page");
 }

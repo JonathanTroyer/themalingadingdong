@@ -7,11 +7,12 @@ use palette::Srgb;
 use tinted_builder::{Base16Scheme, SchemeVariant};
 use tuirealm::Update;
 
-use crate::cli::{Cli, VariantArg};
+use crate::cli::{Cli, OutputFormat, VariantArg};
 use crate::config::{AccentOptSettings, ThemeConfig, load_config};
 use crate::curves::InterpolationConfig;
 use crate::generate::{GenerateConfig, generate_for_variant, parse_color};
 use crate::hellwig::HellwigJmh;
+use crate::import::import_scheme;
 use crate::validation::{ValidationResults, validate_with_accent_data};
 
 use super::activities::Msg;
@@ -91,6 +92,7 @@ pub struct Model {
     pub show_help: bool,
     pub message: Option<String>,
     pub export_path: String,
+    pub output_format: OutputFormat,
 }
 
 impl Model {
@@ -98,16 +100,57 @@ impl Model {
     ///
     /// This uses the same layered configuration as main.rs:
     /// defaults < TOML file < CLI args
+    ///
+    /// If `--input` is specified, loads the scheme file for editing and validates it.
     pub fn from_cli(cli: &Cli) -> Result<Self> {
-        // Load configuration with Figment layering
-        let theme_config = load_config(cli.config.as_deref(), &cli.to_config_overrides())
-            .map_err(|e| color_eyre::eyre::eyre!("Configuration error: {}", e))?;
+        use crate::validation::{validate, validate_with_warnings};
 
-        Self::from_theme_config(&theme_config, cli.variant)
+        // Handle import if --input is specified
+        let (theme_config, imported_scheme, validation_results) =
+            if let Some(ref input_path) = cli.input {
+                let import_result = import_scheme(input_path)?;
+
+                // Validate the imported scheme (for stderr output)
+                let warnings = validate_with_warnings(&import_result.scheme);
+                if !warnings.is_empty() {
+                    eprintln!("Imported scheme validation:");
+                    for warning in &warnings {
+                        eprintln!("  {}", warning);
+                    }
+                }
+
+                // Also get full validation results for TUI display
+                let results = validate(&import_result.scheme);
+
+                (
+                    import_result.config,
+                    Some(import_result.scheme),
+                    Some(results),
+                )
+            } else {
+                // Normal flow: load configuration with Figment layering
+                let config = load_config(cli.config.as_deref(), &cli.to_config_overrides())
+                    .map_err(|e| color_eyre::eyre::eyre!("Configuration error: {}", e))?;
+                (config, None, None)
+            };
+
+        let mut model = Self::from_theme_config(&theme_config, cli.variant, cli.format)?;
+
+        // If we imported a scheme, store it and its validation results
+        if let Some(scheme) = imported_scheme {
+            model.current_scheme = Some(scheme);
+            model.validation_results = validation_results;
+        }
+
+        Ok(model)
     }
 
     /// Create model from a ThemeConfig.
-    pub fn from_theme_config(config: &ThemeConfig, variant: VariantArg) -> Result<Self> {
+    pub fn from_theme_config(
+        config: &ThemeConfig,
+        variant: VariantArg,
+        format: OutputFormat,
+    ) -> Result<Self> {
         let bg_str = config
             .colors
             .background
@@ -139,6 +182,11 @@ impl Model {
             .map(|h| h.to_array())
             .unwrap_or([None; 8]);
 
+        let export_path = match format {
+            OutputFormat::Yaml => String::from("scheme.yaml"),
+            OutputFormat::Json => String::from("scheme.json"),
+        };
+
         Ok(Self {
             background_hellwig,
             foreground_hellwig,
@@ -163,7 +211,8 @@ impl Model {
             quit: false,
             show_help: false,
             message: None,
-            export_path: String::from("scheme.yaml"),
+            export_path,
+            output_format: format,
         })
     }
 
@@ -218,12 +267,20 @@ impl Model {
     }
 
     /// Export the current scheme to a file.
+    ///
+    /// Uses the output format specified at model creation.
     pub fn export(&mut self) -> Result<()> {
         if let Some(ref scheme) = self.current_scheme {
-            let yaml = serde_yaml::to_string(scheme).wrap_err("Failed to serialize scheme")?;
+            let output = match self.output_format {
+                OutputFormat::Yaml => {
+                    serde_yaml::to_string(scheme).wrap_err("Failed to serialize scheme to YAML")?
+                }
+                OutputFormat::Json => serde_json::to_string_pretty(scheme)
+                    .wrap_err("Failed to serialize scheme to JSON")?,
+            };
 
             let path = PathBuf::from(&self.export_path);
-            std::fs::write(&path, &yaml)
+            std::fs::write(&path, &output)
                 .wrap_err_with(|| format!("Failed to write to {}", path.display()))?;
 
             self.message = Some(format!("Exported to {}", path.display()));
@@ -410,6 +467,26 @@ impl Update<Msg> for Model {
             Msg::HideHelp => {
                 self.show_help = false;
                 None
+            }
+
+            // Toggle dark/light variant (idempotent: t twice = original state)
+            Msg::ToggleDarkLight => {
+                // Swap bg/fg
+                std::mem::swap(&mut self.background_hellwig, &mut self.foreground_hellwig);
+                std::mem::swap(&mut self.background, &mut self.foreground);
+
+                // Invert target J (100 - J)
+                self.accent_opt.target_j = 100.0 - self.accent_opt.target_j;
+                self.extended_accent_opt.target_j = 100.0 - self.extended_accent_opt.target_j;
+
+                // Toggle variant for correct export (Dark↔Light is idempotent)
+                self.variant = match self.variant {
+                    VariantArg::Dark => VariantArg::Light,
+                    VariantArg::Light => VariantArg::Dark,
+                    other => other, // Auto/Both unchanged - auto-detection handles it
+                };
+
+                Some(Msg::Regenerate)
             }
 
             // These messages don't need model updates

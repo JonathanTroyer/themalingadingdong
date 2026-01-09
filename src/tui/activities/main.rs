@@ -125,6 +125,9 @@ pub enum Msg {
 
     // Activity transition
     SwitchToCodePreview,
+
+    // Toggle dark/light variant
+    ToggleDarkLight,
 }
 
 // ============================================================================
@@ -347,6 +350,72 @@ impl MainActivity {
         );
         let _ = app.mount(Id::Validation, Box::new(validation), vec![]);
     }
+
+    /// Sync all components including parameter editors (used after dark/light toggle).
+    fn sync_all_components(app: &mut Application<Id, Msg, UserEvent>, model: &Model) {
+        // Remount background picker
+        let _ = app.umount(&Id::BackgroundPicker);
+        let bg_picker = HellwigPicker::new(
+            HellwigPickerType::Background,
+            HellwigValues {
+                lightness: model.background_hellwig.lightness,
+                colorfulness: model.background_hellwig.colorfulness,
+                hue: model.background_hellwig.hue,
+                out_of_gamut: model.background_hellwig.out_of_gamut,
+            },
+            model.background,
+        );
+        let _ = app.mount(Id::BackgroundPicker, Box::new(bg_picker), vec![]);
+
+        // Remount foreground picker
+        let _ = app.umount(&Id::ForegroundPicker);
+        let fg_picker = HellwigPicker::new(
+            HellwigPickerType::Foreground,
+            HellwigValues {
+                lightness: model.foreground_hellwig.lightness,
+                colorfulness: model.foreground_hellwig.colorfulness,
+                hue: model.foreground_hellwig.hue,
+                out_of_gamut: model.foreground_hellwig.out_of_gamut,
+            },
+            model.foreground,
+        );
+        let _ = app.mount(Id::ForegroundPicker, Box::new(fg_picker), vec![]);
+
+        // Remount accent controls (target_j changed)
+        let _ = app.umount(&Id::AccentControls);
+        let accent_controls = AccentControls::new(
+            AccentControlsType::Base,
+            AccentValues {
+                min_contrast: model.min_contrast,
+                target_j: model.accent_opt.target_j,
+                delta_j: model.accent_opt.delta_j,
+                target_m: model.accent_opt.target_m,
+                delta_m: model.accent_opt.delta_m,
+            },
+        );
+        let _ = app.mount(Id::AccentControls, Box::new(accent_controls), vec![]);
+
+        // Remount extended accent controls
+        let _ = app.umount(&Id::ExtendedAccentControls);
+        let extended_controls = AccentControls::new(
+            AccentControlsType::Extended,
+            AccentValues {
+                min_contrast: model.extended_min_contrast,
+                target_j: model.extended_accent_opt.target_j,
+                delta_j: model.extended_accent_opt.delta_j,
+                target_m: model.extended_accent_opt.target_m,
+                delta_m: model.extended_accent_opt.delta_m,
+            },
+        );
+        let _ = app.mount(
+            Id::ExtendedAccentControls,
+            Box::new(extended_controls),
+            vec![],
+        );
+
+        // Also sync display components
+        Self::sync_display_components(app, model);
+    }
 }
 
 impl Activity for MainActivity {
@@ -483,6 +552,7 @@ impl Activity for MainActivity {
         match app.tick(PollStrategy::Once) {
             Ok(messages) => {
                 let mut needs_sync = false;
+                let mut needs_full_sync = false;
 
                 for msg in messages {
                     // Handle focus changes at activity level
@@ -498,6 +568,9 @@ impl Activity for MainActivity {
                         Msg::SwitchToCodePreview => {
                             self.exit_reason = Some(ExitReason::SwitchToCodePreview);
                             return Ok(());
+                        }
+                        Msg::ToggleDarkLight => {
+                            needs_full_sync = true;
                         }
                         _ => {}
                     }
@@ -519,8 +592,12 @@ impl Activity for MainActivity {
                     }
                 }
 
-                // Sync display components after regeneration
-                if needs_sync {
+                // Sync components after changes
+                if needs_full_sync {
+                    Self::sync_all_components(app, model);
+                    // Restore focus after remounting
+                    let _ = app.active(&self.focus.current_focus());
+                } else if needs_sync {
                     Self::sync_display_components(app, model);
                 }
             }

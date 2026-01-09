@@ -54,6 +54,8 @@ pub enum AppAction {
     ValueIncrementLarge,
     /// Decrement value by large step (5)
     ValueDecrementLarge,
+    /// Toggle between dark and light variants
+    ToggleDarkLight,
 }
 
 /// Global dispatcher instance - shared by all components.
@@ -103,6 +105,12 @@ pub static DISPATCHER: LazyLock<TuiRealmDispatcher<AppAction>> = LazyLock::new(|
             .description("Increase value (5x)")
             .build(),
     );
+    config.bind(
+        action(AppAction::ToggleDarkLight)
+            .binding(keys::char('t'))
+            .description("Toggle dark/light variant")
+            .build(),
+    );
 
     config.compile();
     TuiRealmDispatcher::new(config)
@@ -121,6 +129,7 @@ pub fn handle_global_app_events(action: &AppAction) -> Option<Msg> {
         AppAction::Tui(TuiEvent::App(AppEvent::Help)) => Some(Msg::ShowHelp),
         AppAction::Tui(TuiEvent::App(AppEvent::Refresh)) => Some(Msg::Regenerate),
         AppAction::CodePreview => Some(Msg::SwitchToCodePreview),
+        AppAction::ToggleDarkLight => Some(Msg::ToggleDarkLight),
         _ => None,
     }
 }
