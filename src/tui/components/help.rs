@@ -47,6 +47,15 @@ const HELP_GROUPS: &[KeybindingGroup] = &[
             AppAction::Tui(TuiEvent::Navigation(NavigationEvent::Right)),
         ],
     },
+    KeybindingGroup {
+        title: "Value Adjustment",
+        actions: &[
+            AppAction::ValueDecrementSmall,
+            AppAction::ValueIncrementSmall,
+            AppAction::ValueDecrementLarge,
+            AppAction::ValueIncrementLarge,
+        ],
+    },
 ];
 
 /// Extra keybindings not in dispatcher (component-specific behaviors).

@@ -1,63 +1,40 @@
 #!/usr/bin/env bash
-# Example shell script for syntax highlighting preview.
+# Syntax preview: comments, keywords, strings, escapes, variables.
 
 set -euo pipefail
 
-readonly MAX_RETRIES=3
-readonly API_URL="https://api.example.com"
+readonly MAX_ITEMS=100
+readonly VERSION="1.0.0"
 
-declare -A CONFIG=(
-    [name]="example"
-    [enabled]="true"
-    [retries]="$MAX_RETRIES"
-)
+declare -A CONFIG=([name]="example" [count]=0 [enabled]="true")
 
 validate_config() {
     local name="${CONFIG[name]}"
-    local retries="${CONFIG[retries]}"
-
     if [[ -z "$name" ]]; then
         echo "Error: Name cannot be empty" >&2
         return 1
     fi
-
-    if (( retries > 10 )); then
-        echo "Error: Retries $retries exceeds maximum" >&2
-        return 1
-    fi
-
     return 0
 }
 
-process_items() {
+process() {
     local -a items=("$@")
-    local -A result=()
-
     for item in "${items[@]}"; do
-        if (( item % 2 == 0 )); then
-            result[$item]="true"
-        else
-            result[$item]="false"
+        if (( item < 0 )); then
+            continue
         fi
-    done
-
-    for key in "${!result[@]}"; do
-        echo "$key: ${result[$key]}"
+        local is_even=$(( item % 2 == 0 ))
+        echo "$item: $is_even"
     done
 }
 
-main() {
-    echo "Config: name=${CONFIG[name]}, enabled=${CONFIG[enabled]}"
-
-    if ! validate_config; then
-        exit 1
+parse_email() {
+    local text="$1"
+    if [[ "$text" =~ [a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]+ ]]; then
+        echo "${BASH_REMATCH[0]}"
     fi
-
-    local items=(1 2 3 4 5)
-    echo "Processing items..."
-    process_items "${items[@]}"
-
-    echo "Done!"
 }
 
-main "$@"
+msg=$'Hello\tWorld\n'
+echo "Config: name=${CONFIG[name]}, msg=$msg, version=$VERSION"
+validate_config && process 1 2 -3 4 5

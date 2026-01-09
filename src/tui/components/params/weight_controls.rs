@@ -248,6 +248,25 @@ impl Component<Msg, UserEvent> for WeightControls {
                     None
                 }
             }
+
+            // Value adjustment: [/] for ±0.05, {/} for ±0.25
+            AppAction::ValueDecrementSmall => {
+                self.adjust_current(-0.05);
+                self.msg_for_change()
+            }
+            AppAction::ValueIncrementSmall => {
+                self.adjust_current(0.05);
+                self.msg_for_change()
+            }
+            AppAction::ValueDecrementLarge => {
+                self.adjust_current(-0.25);
+                self.msg_for_change()
+            }
+            AppAction::ValueIncrementLarge => {
+                self.adjust_current(0.25);
+                self.msg_for_change()
+            }
+
             _ => None,
         }
     }

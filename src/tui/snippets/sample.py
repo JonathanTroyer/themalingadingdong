@@ -1,48 +1,39 @@
-"""Example Python code for syntax highlighting preview."""
+# Syntax preview: comments, keywords, types, strings, escapes, regex.
 
-import json
 import re
 from dataclasses import dataclass
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
-MAX_RETRIES = 3
-API_URL = "https://api.example.com"
+MAX_ITEMS = 100
+VERSION = "1.0.0"
 
 @dataclass
 class Config:
     name: str
+    count: int = 0
     enabled: bool = True
-    retries: int = MAX_RETRIES
 
     def validate(self) -> Optional[str]:
         if not self.name:
             return "Name cannot be empty"
-        if self.retries > 10:
-            return f"Retries {self.retries} exceeds maximum"
         return None
 
-def process_items(items: List[int]) -> Dict[int, bool]:
+def process(items: List[int]) -> Dict[int, bool]:
     result = {}
     for item in items:
-        is_even = item % 2 == 0
-        result[item] = is_even
+        if item < 0:
+            continue
+        result[item] = item % 2 == 0
     return result
 
 def parse_email(text: str) -> Optional[str]:
-    pattern = r"[\w\.-]+@[\w\.-]+\.\w+"
+    pattern = r"[\w.-]+@[\w.-]+\.\w+"
     match = re.search(pattern, text)
     return match.group(0) if match else None
 
-def main():
-    config = Config(name="example")
-    error = config.validate()
-    if error:
-        print(f"Error: {error}")
-        return
-
-    items = [1, 2, 3, 4, 5]
-    processed = process_items(items)
-    print(f"Processed: {json.dumps(processed)}")
-
 if __name__ == "__main__":
-    main()
+    msg = "Hello\tWorld\n"
+    config = Config(name="example")
+    print(f"Config: {config}, msg: {msg!r}")
+    print(f"Email: {parse_email('test@example.com')}")
+    print(f"Result: {process([1, 2, -3, 4, 5])}")

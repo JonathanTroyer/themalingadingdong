@@ -330,6 +330,36 @@ impl Component<Msg, UserEvent> for HueGrid {
                 None
             }
 
+            // Value adjustment: [/] for ±1 degree, {/} for ±5 degrees
+            AppAction::ValueDecrementSmall => {
+                self.adjust_current(-1.0);
+                Some(Msg::HueOverrideChanged(
+                    self.selected as u8,
+                    self.hues[self.selected],
+                ))
+            }
+            AppAction::ValueIncrementSmall => {
+                self.adjust_current(1.0);
+                Some(Msg::HueOverrideChanged(
+                    self.selected as u8,
+                    self.hues[self.selected],
+                ))
+            }
+            AppAction::ValueDecrementLarge => {
+                self.adjust_current(-5.0);
+                Some(Msg::HueOverrideChanged(
+                    self.selected as u8,
+                    self.hues[self.selected],
+                ))
+            }
+            AppAction::ValueIncrementLarge => {
+                self.adjust_current(5.0);
+                Some(Msg::HueOverrideChanged(
+                    self.selected as u8,
+                    self.hues[self.selected],
+                ))
+            }
+
             _ => None,
         }
     }

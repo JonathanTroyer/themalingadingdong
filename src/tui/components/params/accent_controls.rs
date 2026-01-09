@@ -364,6 +364,25 @@ impl Component<Msg, UserEvent> for AccentControls {
                     None
                 }
             }
+
+            // Value adjustment: [/] for ±1, {/} for ±5
+            AppAction::ValueDecrementSmall => {
+                self.adjust_current(-1.0);
+                self.msg_for_change()
+            }
+            AppAction::ValueIncrementSmall => {
+                self.adjust_current(1.0);
+                self.msg_for_change()
+            }
+            AppAction::ValueDecrementLarge => {
+                self.adjust_current(-5.0);
+                self.msg_for_change()
+            }
+            AppAction::ValueIncrementLarge => {
+                self.adjust_current(5.0);
+                self.msg_for_change()
+            }
+
             _ => None,
         }
     }

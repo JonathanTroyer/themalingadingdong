@@ -46,6 +46,14 @@ pub enum AppAction {
     Tui(TuiEvent),
     /// Switch to code preview screen
     CodePreview,
+    /// Increment value by small step (1)
+    ValueIncrementSmall,
+    /// Decrement value by small step (1)
+    ValueDecrementSmall,
+    /// Increment value by large step (5)
+    ValueIncrementLarge,
+    /// Decrement value by large step (5)
+    ValueDecrementLarge,
 }
 
 /// Global dispatcher instance - shared by all components.
@@ -62,11 +70,37 @@ pub static DISPATCHER: LazyLock<TuiRealmDispatcher<AppAction>> = LazyLock::new(|
         });
     }
 
-    // Add custom binding
+    // Add custom bindings
     config.bind(
         action(AppAction::CodePreview)
             .binding(keys::char('c'))
             .description("View code preview")
+            .build(),
+    );
+
+    // Value adjustment bindings: [/] for small steps, {/} for large steps
+    config.bind(
+        action(AppAction::ValueDecrementSmall)
+            .binding(keys::char('['))
+            .description("Decrease value")
+            .build(),
+    );
+    config.bind(
+        action(AppAction::ValueIncrementSmall)
+            .binding(keys::char(']'))
+            .description("Increase value")
+            .build(),
+    );
+    config.bind(
+        action(AppAction::ValueDecrementLarge)
+            .binding(keys::char('{'))
+            .description("Decrease value (5x)")
+            .build(),
+    );
+    config.bind(
+        action(AppAction::ValueIncrementLarge)
+            .binding(keys::char('}'))
+            .description("Increase value (5x)")
             .build(),
     );
 

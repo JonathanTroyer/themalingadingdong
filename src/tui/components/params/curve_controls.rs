@@ -425,6 +425,45 @@ impl Component<Msg, UserEvent> for CurveControls {
                     None
                 }
             }
+
+            // Value adjustment: [/] for ±0.05, {/} for ±0.25 (strength sliders only)
+            AppAction::ValueDecrementSmall => {
+                if self.sub_focus.is_strength() {
+                    self.adjust_strength(-0.05);
+                    self.msg_for_change()
+                } else {
+                    self.cycle_type(false);
+                    self.msg_for_change()
+                }
+            }
+            AppAction::ValueIncrementSmall => {
+                if self.sub_focus.is_strength() {
+                    self.adjust_strength(0.05);
+                    self.msg_for_change()
+                } else {
+                    self.cycle_type(true);
+                    self.msg_for_change()
+                }
+            }
+            AppAction::ValueDecrementLarge => {
+                if self.sub_focus.is_strength() {
+                    self.adjust_strength(-0.25);
+                    self.msg_for_change()
+                } else {
+                    self.cycle_type(false);
+                    self.msg_for_change()
+                }
+            }
+            AppAction::ValueIncrementLarge => {
+                if self.sub_focus.is_strength() {
+                    self.adjust_strength(0.25);
+                    self.msg_for_change()
+                } else {
+                    self.cycle_type(true);
+                    self.msg_for_change()
+                }
+            }
+
             _ => None,
         }
     }

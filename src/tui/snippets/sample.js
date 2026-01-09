@@ -1,33 +1,25 @@
-/**
- * Example JavaScript code for syntax highlighting preview.
- */
+// Syntax preview: comments, keywords, types, strings, escapes, labels.
 
-const MAX_RETRIES = 3;
-const API_URL = "https://api.example.com";
+const MAX_ITEMS = 100;
+const VERSION = "1.0.0";
 
 class Config {
     constructor(name) {
         this.name = name;
+        this.count = 0;
         this.enabled = true;
-        this.retries = MAX_RETRIES;
     }
-
     validate() {
-        if (!this.name) {
-            throw new Error("Name cannot be empty");
-        }
-        if (this.retries > 10) {
-            throw new Error(`Retries ${this.retries} exceeds maximum`);
-        }
+        if (!this.name) throw new Error("Name cannot be empty");
         return true;
     }
 }
 
-function processItems(items) {
+function process(items) {
     const result = {};
-    for (const item of items) {
-        const isEven = item % 2 === 0;
-        result[item] = isEven;
+    outer: for (const item of items) {
+        if (item < 0) continue outer;
+        result[item] = item % 2 === 0;
     }
     return result;
 }
@@ -38,18 +30,9 @@ function parseEmail(text) {
     return match ? match[0] : null;
 }
 
-async function main() {
-    const config = new Config("example");
-    try {
-        config.validate();
-        console.log(`Config: ${JSON.stringify(config)}`);
-
-        const items = [1, 2, 3, 4, 5];
-        const processed = processItems(items);
-        console.log(`Processed: ${JSON.stringify(processed)}`);
-    } catch (error) {
-        console.error(`Error: ${error.message}`);
-    }
-}
-
-main();
+const msg = "Hello\tWorld\n";
+const config = new Config("example");
+config.validate();
+console.log(`Config: ${JSON.stringify(config)}, msg: ${msg}`);
+console.log(`Email: ${parseEmail("test@example.com")}`);
+console.log(`Result: ${JSON.stringify(process([1, 2, -3, 4, 5]))}`);

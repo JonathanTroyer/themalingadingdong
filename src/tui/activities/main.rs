@@ -454,7 +454,8 @@ impl Activity for MainActivity {
             let status = model
                 .message
                 .clone()
-                .unwrap_or_else(|| format_footer(MAIN_FOOTER_ACTIONS, &[("adjust", "arrows")]));
+                .unwrap_or_else(|| format_footer(MAIN_FOOTER_ACTIONS, &[("adjust", "[]/{}")]));
+
             let status_widget =
                 Paragraph::new(status).style(Style::default().add_modifier(Modifier::DIM));
             frame.render_widget(status_widget, main_rows[2]);
