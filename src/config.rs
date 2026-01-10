@@ -4,16 +4,13 @@
 //! `defaults < TOML file < CLI args`
 
 use std::path::Path;
-use std::str::FromStr;
 
-use csscolorparser::Color as CssColor;
 use figment::Figment;
 use figment::providers::{Format, Serialized, Toml};
-use palette::Srgb;
 use serde::{Deserialize, Serialize};
 
 use crate::curves::InterpolationConfig;
-use crate::generate::GenerateConfig;
+use crate::generate::{GenerateConfig, parse_color};
 
 /// Error type for configuration operations.
 #[derive(Debug)]
@@ -33,7 +30,7 @@ impl std::fmt::Display for ConfigError {
         match self {
             Self::Io(e) => write!(f, "IO error: {}", e),
             Self::Figment(e) => write!(f, "Configuration error: {}", e),
-            Self::InvalidColor(s) => write!(f, "Invalid color: {}", s),
+            Self::InvalidColor(s) => write!(f, "{}", s),
             Self::MissingField(field) => write!(f, "Missing required field: {}", field),
         }
     }
@@ -70,14 +67,21 @@ pub fn load_config(
     Ok(figment.extract()?)
 }
 
-/// Validate that required fields are present in the configuration.
+/// Validate that required fields are present and valid in the configuration.
 pub fn validate_config(config: &ThemeConfig) -> Result<(), ConfigError> {
-    if config.colors.background.is_none() {
+    // Validate colors first - this gives the most actionable error message
+    if let Some(ref bg) = config.colors.background {
+        parse_color(bg).map_err(ConfigError::InvalidColor)?;
+    } else {
         return Err(ConfigError::MissingField("colors.background"));
     }
-    if config.colors.foreground.is_none() {
+
+    if let Some(ref fg) = config.colors.foreground {
+        parse_color(fg).map_err(ConfigError::InvalidColor)?;
+    } else {
         return Err(ConfigError::MissingField("colors.foreground"));
     }
+
     Ok(())
 }
 
@@ -346,23 +350,4 @@ impl ThemeConfig {
             extended_optimization: config.extended_accent_opt.clone(),
         }
     }
-}
-
-/// Parse any CSS color string into Srgb<u8>.
-///
-/// Supports: hex (#RRGGBB), rgb(), oklch(), named colors, etc.
-pub fn parse_color(input: &str) -> Result<Srgb<u8>, String> {
-    let css_color: CssColor = input
-        .parse()
-        .map_err(|e| format!("Invalid color '{}': {}", input, e))?;
-    let [r, g, b, _a] = css_color.to_rgba8();
-    Ok(Srgb::new(r, g, b))
-}
-
-/// Parse a hex color string into an Srgb<u8>.
-#[deprecated(note = "Use parse_color() instead which supports more formats")]
-pub fn parse_hex(hex: &str) -> Result<Srgb<u8>, String> {
-    // palette's FromStr expects 6 hex chars without #
-    let hex = hex.trim_start_matches('#');
-    Srgb::from_str(hex).map_err(|e| format!("Invalid hex color: {e}"))
 }

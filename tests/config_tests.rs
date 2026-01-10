@@ -1,13 +1,6 @@
 use themalingadingdong::config::{HueOverrides, ThemeConfig};
 
 #[test]
-fn test_default_config() {
-    let config = ThemeConfig::default();
-    assert!(config.theme.name.is_empty());
-    assert!(config.colors.background.is_none());
-}
-
-#[test]
 fn test_parse_toml() {
     let toml_str = r##"
 [theme]

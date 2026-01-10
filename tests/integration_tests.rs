@@ -108,7 +108,7 @@ fn test_cli_invalid_hex_fails() {
         ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Invalid color"));
+        .stderr(predicate::str::contains("invalid"));
 }
 
 #[test]

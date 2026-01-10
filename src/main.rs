@@ -221,7 +221,7 @@ fn variant_filename(
     let suffix = match variant {
         SchemeVariant::Dark => "-dark",
         SchemeVariant::Light => "-light",
-        v => unimplemented!("unsupported variant: {v:?}"),
+        v => unreachable!("unsupported variant: {v:?}"),
     };
 
     let ext = match format {

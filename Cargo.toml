@@ -2,8 +2,12 @@
 name = "themalingadingdong"
 version = "0.2.0"
 edition = "2024"
-description = "Base24 palette generator using OKLCH with APCA validation"
+description = "Base24 palette generator using Hellwig-Fairchild CAM16 with APCA validation"
 license = "MIT"
+repository = "https://github.com/JonathanTroyer/themalingadingdong"
+homepage = "https://github.com/JonathanTroyer/themalingadingdong"
+keywords = ["color", "theme", "base16", "base24", "accessibility"]
+categories = ["command-line-utilities", "graphics"]
 
 [dependencies]
 palette = { version = "0.7", features = ["std"] }
@@ -22,9 +26,7 @@ tuirealm = { version = "3.2", default-features = false, features = [
   "crossterm",
   "derive",
 ] }
-crossterm-actions = { version = "0.6.0", path = "../crossterm-actions", features = [
-  "tui-realm",
-] }
+crossterm-actions = { version = "1.0.0", features = ["tui-realm"] }
 float-cmp = "0.10"
 enterpolation = "0.3"
 figment = { version = "0.10", features = ["toml"] }
@@ -49,6 +51,7 @@ clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 clap_mangen = "0.2"
 serde = { version = "1", features = ["derive"] }
+csscolorparser = "0.8"
 
 [[bench]]
 name = "benchmarks"

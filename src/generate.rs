@@ -114,7 +114,7 @@ pub fn generate_for_variant(
     let (background, foreground, variant) = match forced_variant {
         Some(SchemeVariant::Dark) => (darker, lighter, SchemeVariant::Dark),
         Some(SchemeVariant::Light) => (lighter, darker, SchemeVariant::Light),
-        Some(v) => unimplemented!("unsupported variant: {v:?}"),
+        Some(v) => unreachable!("unsupported variant: {v:?}"),
         None => {
             // Auto: dark if input bg is darker than fg
             if bg_l < fg_l {
@@ -183,7 +183,7 @@ pub fn generate_for_variant(
     let variant_suffix = match variant {
         SchemeVariant::Dark => "-dark",
         SchemeVariant::Light => "-light",
-        v => unimplemented!("unsupported variant: {v:?}"),
+        v => unreachable!("unsupported variant: {v:?}"),
     };
     let base_slug: String = config
         .name
@@ -219,7 +219,7 @@ pub fn generate_for_variant(
     }
 }
 
-/// Parse any CSS color string into Srgb<u8>.
+/// Parse any CSS color string into `Srgb<u8>`.
 ///
 /// Supports: hex (#RRGGBB), rgb(), oklch(), named colors, etc.
 pub fn parse_color(input: &str) -> Result<Srgb<u8>, String> {

@@ -63,7 +63,8 @@ pub struct Cli {
         long,
         default_value_if("interactive", "true", "#000000"),
         default_value_if("input", ArgPredicate::IsPresent, "#000000"),
-        required_unless_present_any = ["interactive", "config", "completions", "input"]
+        required_unless_present_any = ["interactive", "config", "completions", "input"],
+        value_parser = |s: &str| s.parse::<csscolorparser::Color>().map(|_| s.to_string()).map_err(|e| e.to_string())
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<String>,
@@ -74,7 +75,8 @@ pub struct Cli {
         long,
         default_value_if("interactive", "true", "#FFFFFF"),
         default_value_if("input", ArgPredicate::IsPresent, "#FFFFFF"),
-        required_unless_present_any = ["interactive", "config", "completions", "input"]
+        required_unless_present_any = ["interactive", "config", "completions", "input"],
+        value_parser = |s: &str| s.parse::<csscolorparser::Color>().map(|_| s.to_string()).map_err(|e| e.to_string())
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreground: Option<String>,

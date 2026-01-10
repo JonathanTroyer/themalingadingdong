@@ -15,8 +15,7 @@ use std::sync::LazyLock;
 
 use color_eyre::eyre::Result;
 use crossterm_actions::{
-    ActionBinding, ActionConfig, AppEvent, EditingMode, TuiEvent, TuiRealmDispatcher, action,
-    defaults, keys,
+    AppEvent, TuiEvent, TuiRealmDispatcher, bind_action, emacs_defaults, keys,
 };
 use ratatui::{
     Terminal,
@@ -29,7 +28,7 @@ use ratatui::{
 
 use crate::cli::Cli;
 
-pub use highlighting::{Highlighter, SYNTAX_SET};
+pub use highlighting::Highlighter;
 pub use model::Model;
 
 use activities::Msg;
@@ -61,55 +60,45 @@ pub enum AppAction {
 /// Global dispatcher instance - shared by all components.
 /// Using LazyLock for zero-cost lazy initialization.
 pub static DISPATCHER: LazyLock<TuiRealmDispatcher<AppAction>> = LazyLock::new(|| {
-    let mut config = ActionConfig::new(EditingMode::Emacs);
+    // Transform emacs defaults to wrap in AppAction::Tui
+    let mut config = emacs_defaults().map_actions(AppAction::Tui);
 
-    // Import all standard TuiEvent bindings wrapped in AppAction::Tui
-    for binding in defaults::emacs_defaults().bindings() {
-        config.bind(ActionBinding {
-            action: AppAction::Tui(binding.action),
-            keys: binding.keys.clone(),
-            description: binding.description.clone(),
-        });
-    }
-
-    // Add custom bindings
-    config.bind(
-        action(AppAction::CodePreview)
-            .binding(keys::char('c'))
-            .description("View code preview")
-            .build(),
+    // Custom app bindings
+    bind_action!(
+        config,
+        AppAction::CodePreview,
+        keys::char('c'),
+        "View code preview"
     );
-
-    // Value adjustment bindings: [/] for small steps, {/} for large steps
-    config.bind(
-        action(AppAction::ValueDecrementSmall)
-            .binding(keys::char('['))
-            .description("Decrease value")
-            .build(),
+    bind_action!(
+        config,
+        AppAction::ValueDecrementSmall,
+        keys::char('['),
+        "Decrease value"
     );
-    config.bind(
-        action(AppAction::ValueIncrementSmall)
-            .binding(keys::char(']'))
-            .description("Increase value")
-            .build(),
+    bind_action!(
+        config,
+        AppAction::ValueIncrementSmall,
+        keys::char(']'),
+        "Increase value"
     );
-    config.bind(
-        action(AppAction::ValueDecrementLarge)
-            .binding(keys::char('{'))
-            .description("Decrease value (5x)")
-            .build(),
+    bind_action!(
+        config,
+        AppAction::ValueDecrementLarge,
+        keys::char('{'),
+        "Decrease value (5x)"
     );
-    config.bind(
-        action(AppAction::ValueIncrementLarge)
-            .binding(keys::char('}'))
-            .description("Increase value (5x)")
-            .build(),
+    bind_action!(
+        config,
+        AppAction::ValueIncrementLarge,
+        keys::char('}'),
+        "Increase value (5x)"
     );
-    config.bind(
-        action(AppAction::ToggleDarkLight)
-            .binding(keys::char('t'))
-            .description("Toggle dark/light variant")
-            .build(),
+    bind_action!(
+        config,
+        AppAction::ToggleDarkLight,
+        keys::char('t'),
+        "Toggle dark/light variant"
     );
 
     config.compile();

@@ -86,34 +86,6 @@ pub struct AccentResult {
     pub warning: Option<String>,
 }
 
-/// Interpolate between two colors in HellwigJmh space.
-///
-/// Interpolates all three components (lightness, colorfulness, hue) using
-/// HellwigJmh's perceptually uniform space for smooth color transitions.
-/// This is a convenience wrapper around `interpolate_with_curves` using linear curves.
-///
-/// # Arguments
-///
-/// * `start` - Starting color (typically the background)
-/// * `end` - Ending color (typically the foreground)
-/// * `steps` - Number of colors to generate (inclusive of start and end)
-///
-/// # Example
-///
-/// ```
-/// use palette::Srgb;
-/// use themalingadingdong::interpolation::interpolate_lightness;
-///
-/// let dark = Srgb::new(0.1f32, 0.1, 0.12);
-/// let light = Srgb::new(0.9f32, 0.9, 0.88);
-///
-/// let colors = interpolate_lightness(dark, light, 8);
-/// assert_eq!(colors.len(), 8);
-/// ```
-pub fn interpolate_lightness(start: Srgb<f32>, end: Srgb<f32>, steps: usize) -> Vec<Srgb<f32>> {
-    interpolate_with_curves(start, end, steps, &InterpolationConfig::default())
-}
-
 /// Interpolate between two colors in HellwigJmh space with configurable curves.
 ///
 /// Uses separate curve configurations for lightness, colorfulness, and hue components,
@@ -192,80 +164,6 @@ fn lerp_hue(a: f32, b: f32, t: f32) -> f32 {
         diff
     };
     (a + adjusted_diff * t).rem_euclid(360.0)
-}
-
-/// Generate accent colors by rotating hue at constant lightness and colorfulness.
-///
-/// # Arguments
-///
-/// * `start_hue` - Starting hue in degrees (0-360)
-/// * `lightness` - Constant lightness for all accents (HellwigJmh J', 0-100)
-/// * `colorfulness` - Constant colorfulness for all accents (HellwigJmh M)
-/// * `count` - Number of accent colors to generate
-///
-/// # Example
-///
-/// ```
-/// use themalingadingdong::interpolation::generate_accent_hues;
-///
-/// let accents = generate_accent_hues(25.0, 70.0, 25.0, 8);
-/// assert_eq!(accents.len(), 8);
-/// ```
-pub fn generate_accent_hues(
-    start_hue: f32,
-    lightness: f32,
-    colorfulness: f32,
-    count: usize,
-) -> Vec<Srgb<f32>> {
-    if count == 0 {
-        return vec![];
-    }
-
-    let hue_step = 360.0 / count as f32;
-
-    (0..count)
-        .map(|i| {
-            let hue = (start_hue + i as f32 * hue_step) % 360.0;
-            let hellwig = HellwigJmh::new(lightness, colorfulness, hue);
-            hellwig.into_srgb()
-        })
-        .collect()
-}
-
-/// Generate evenly-spaced hues starting from a given hue.
-///
-/// This is Step 1 of the two-step accent generation process.
-/// Future enhancements could make hue spacing perceptually uniform
-/// or avoid problematic gamut boundary hues.
-///
-/// # Arguments
-///
-/// * `start_hue` - Starting hue in degrees (0-360)
-/// * `count` - Number of hues to generate
-///
-/// # Returns
-///
-/// Vector of hue values in degrees, evenly spaced around the color wheel.
-///
-/// # Example
-///
-/// ```
-/// use themalingadingdong::interpolation::generate_hues;
-///
-/// let hues = generate_hues(25.0, 8);
-/// assert_eq!(hues.len(), 8);
-/// assert_eq!(hues[0], 25.0);  // First hue is the starting hue
-/// ```
-pub fn generate_hues(start_hue: f32, count: usize) -> Vec<f32> {
-    if count == 0 {
-        return vec![];
-    }
-
-    let hue_step = 360.0 / count as f32;
-
-    (0..count)
-        .map(|i| (start_hue + i as f32 * hue_step) % 360.0)
-        .collect()
 }
 
 /// Generate accent colors with COBYLA optimization.
@@ -359,10 +257,4 @@ pub fn srgb_to_f32(color: Srgb<u8>) -> Srgb<f32> {
 /// Convert sRGB to hex string (without # prefix).
 pub fn srgb_to_hex(color: Srgb<u8>) -> String {
     format!("{:02x}{:02x}{:02x}", color.red, color.green, color.blue)
-}
-
-/// Convert sRGB to HellwigJmh components (lightness, colorfulness, hue).
-pub fn srgb_to_hellwig(color: Srgb<u8>) -> (f32, f32, f32) {
-    let hellwig = HellwigJmh::from_srgb_u8(color);
-    (hellwig.lightness, hellwig.colorfulness, hellwig.hue)
 }

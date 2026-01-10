@@ -211,24 +211,6 @@ impl HellwigJmh {
             && is_channel_in_bounds(srgb.blue)
     }
 
-    /// Convert to sRGB with gamut clamping and return the post-clamp HellwigJmh.
-    ///
-    /// This gives the "actual" color appearance after gamut mapping.
-    /// Useful for measuring the true perceived lightness of a color
-    /// that may be out of sRGB gamut.
-    ///
-    /// Note: This uses simple RGB clamping which distorts hue. For hue-preserving
-    /// gamut mapping, use `gamut_mapped_perceptual()` instead.
-    pub fn gamut_mapped(self) -> Self {
-        let srgb = self.into_srgb();
-        let clamped = Srgb::new(
-            srgb.red.clamp(0.0, 1.0),
-            srgb.green.clamp(0.0, 1.0),
-            srgb.blue.clamp(0.0, 1.0),
-        );
-        Self::from_srgb(clamped)
-    }
-
     /// Convert to sRGB with perceptual gamut mapping.
     ///
     /// Unlike `into_srgb()` which may produce out-of-gamut values,
@@ -249,14 +231,6 @@ impl HellwigJmh {
             (srgb.blue.clamp(0.0, 1.0) * 255.0).round() as u8,
         )
     }
-
-    /// Convert to gamut-mapped HellwigJmh using perceptual mapping.
-    ///
-    /// This preserves hue by projecting toward the achromatic axis,
-    /// unlike `gamut_mapped()` which uses simple RGB clamping.
-    pub fn gamut_mapped_perceptual(self) -> Self {
-        gamut_map(self)
-    }
 }
 
 /// Get HellwigJmh lightness for an sRGB color.
@@ -265,104 +239,4 @@ impl HellwigJmh {
 /// Returns J' (lightness with HK effect), range ~0-101.56.
 pub fn hellwig_lightness(color: Srgb<u8>) -> f32 {
     HellwigJmh::from_srgb_u8(color).lightness
-}
-
-/// Compute post-clamp lightness for given Hellwig parameters.
-///
-/// Creates a HellwigJmh color, converts to sRGB (with clamping), and returns
-/// the lightness of the clamped color. This gives the "actual" perceived
-/// lightness after gamut mapping.
-///
-/// # Arguments
-/// * `lightness` - Input lightness (J' scale, 0-100)
-/// * `colorfulness` - Colorfulness (M)
-/// * `hue` - Hue angle in degrees
-///
-/// # Returns
-/// The post-clamp lightness (J' of the gamut-mapped color)
-pub fn post_clamp_lightness(lightness: f32, colorfulness: f32, hue: f32) -> f32 {
-    HellwigJmh::new(lightness, colorfulness, hue)
-        .gamut_mapped()
-        .lightness
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use approx::assert_relative_eq;
-
-    #[test]
-    fn eccentricity_range() {
-        for hue_deg in (0..360).step_by(10) {
-            let hue_rad = (hue_deg as f32).to_radians();
-            let e = eccentricity(hue_rad);
-            assert!(
-                e > 0.5 && e < 1.5,
-                "eccentricity at {}° = {} (expected 0.5-1.5)",
-                hue_deg,
-                e
-            );
-        }
-    }
-
-    #[test]
-    fn hue_dependency_range() {
-        for hue_deg in (0..360).step_by(10) {
-            let hue_rad = (hue_deg as f32).to_radians();
-            let f = hue_angle_dependency(hue_rad);
-            assert!(
-                f > 0.2 && f < 1.5,
-                "HK factor at {}° = {} (expected 0.2-1.5)",
-                hue_deg,
-                f
-            );
-        }
-    }
-
-    #[test]
-    fn roundtrip_chromatic() {
-        let original = Srgb::new(0.5f32, 0.3, 0.8);
-        let hellwig = HellwigJmh::from_srgb(original);
-        let result = hellwig.into_srgb();
-
-        assert_relative_eq!(original.red, result.red, epsilon = 0.01);
-        assert_relative_eq!(original.green, result.green, epsilon = 0.01);
-        assert_relative_eq!(original.blue, result.blue, epsilon = 0.01);
-    }
-
-    #[test]
-    fn roundtrip_gray() {
-        let original = Srgb::new(0.5f32, 0.5, 0.5);
-        let hellwig = HellwigJmh::from_srgb(original);
-        let result = hellwig.into_srgb();
-
-        assert_relative_eq!(original.red, result.red, epsilon = 0.01);
-        assert_relative_eq!(original.green, result.green, epsilon = 0.01);
-        assert_relative_eq!(original.blue, result.blue, epsilon = 0.01);
-    }
-
-    #[test]
-    fn black_has_zero_lightness() {
-        let black = Srgb::new(0.0f32, 0.0, 0.0);
-        let hellwig = HellwigJmh::from_srgb(black);
-        assert!(hellwig.lightness < 0.01);
-    }
-
-    #[test]
-    fn white_has_high_lightness() {
-        let white = Srgb::new(1.0f32, 1.0, 1.0);
-        let hellwig = HellwigJmh::from_srgb(white);
-        assert!(hellwig.lightness > 95.0);
-    }
-
-    #[test]
-    fn gray_has_low_colorfulness() {
-        let gray = Srgb::new(0.5f32, 0.5, 0.5);
-        let hellwig = HellwigJmh::from_srgb(gray);
-        assert!(
-            hellwig.colorfulness < 2.0,
-            "Gray colorfulness = {} (expected < 2.0)",
-            hellwig.colorfulness
-        );
-    }
 }

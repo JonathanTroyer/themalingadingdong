@@ -654,7 +654,9 @@ dependencies = [
 
 [[package]]
 name = "crossterm-actions"
-version = "0.6.0"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03ae963ed2adc5161da17b701dce589d1d8e9f32aa32607a63281b470cbc3a5d"
 dependencies = [
  "bon",
  "crossterm 0.28.1",

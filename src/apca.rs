@@ -143,54 +143,6 @@ pub fn contrast_from_luminances(y_fg: f64, y_bg: f64) -> f64 {
     }
 }
 
-/// Invert APCA to find foreground luminance (Y) for a target contrast.
-///
-/// Given a background luminance and target Lc, computes the foreground Y
-/// that would achieve that contrast. This is useful for establishing
-/// search bounds when solving for lightness.
-///
-/// # Arguments
-///
-/// * `bg_y` - Background luminance (Y), typically from `srgb_to_luminance()`
-/// * `target_lc` - Target APCA contrast (absolute value, e.g., 75.0)
-/// * `is_dark_bg` - True if background is dark (Y < 0.18), false if light
-///
-/// # Returns
-///
-/// `Some(fg_y)` if the target is achievable, `None` if physically impossible.
-///
-/// # Note
-///
-/// This inversion ignores the low-luminance soft clamp for simplicity,
-/// so results near Y=0 may be approximate.
-pub fn invert_apca_for_y(bg_y: f64, target_lc: f64, is_dark_bg: bool) -> Option<f64> {
-    let lc_abs = target_lc.abs();
-
-    if is_dark_bg {
-        // Dark bg formula: Lc = SCALE * (Y_bg^EXP_BG_DARK - Y_fg^EXP_FG_DARK + OFFSET) * 100
-        // Solving for Y_fg:
-        // Y_fg^EXP_FG_DARK = Y_bg^EXP_BG_DARK + OFFSET - lc_abs / (SCALE * 100)
-        let rhs = bg_y.powf(EXP_BG_DARK) + OFFSET - lc_abs / (SCALE * 100.0);
-
-        if rhs <= 0.0 {
-            return None; // Target unreachable
-        }
-
-        Some(rhs.powf(1.0 / EXP_FG_DARK))
-    } else {
-        // Light bg formula: Lc = SCALE * (Y_bg^EXP_BG_LIGHT - Y_fg^EXP_FG_LIGHT - OFFSET) * 100
-        // Solving for Y_fg:
-        // Y_fg^EXP_FG_LIGHT = Y_bg^EXP_BG_LIGHT - OFFSET - lc_abs / (SCALE * 100)
-        let rhs = bg_y.powf(EXP_BG_LIGHT) - OFFSET - lc_abs / (SCALE * 100.0);
-
-        if rhs <= 0.0 {
-            return None; // Target unreachable
-        }
-
-        Some(rhs.powf(1.0 / EXP_FG_LIGHT))
-    }
-}
-
 /// APCA contrast thresholds for different use cases.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Threshold {
@@ -202,12 +154,6 @@ pub struct Threshold {
 pub mod thresholds {
     use super::Threshold;
 
-    /// Body text (preferred level) - Lc 90
-    pub const BODY_TEXT: Threshold = Threshold {
-        min_lc: 90.0,
-        description: "Body text (preferred)",
-    };
-
     /// Body text (minimum level) - Lc 75
     pub const BODY_TEXT_MIN: Threshold = Threshold {
         min_lc: 75.0,
@@ -218,17 +164,5 @@ pub mod thresholds {
     pub const CONTENT_TEXT: Threshold = Threshold {
         min_lc: 60.0,
         description: "Content text",
-    };
-
-    /// Headlines and large text - Lc 45
-    pub const HEADLINES: Threshold = Threshold {
-        min_lc: 45.0,
-        description: "Headlines",
-    };
-
-    /// UI components and controls - Lc 30
-    pub const UI_COMPONENTS: Threshold = Threshold {
-        min_lc: 30.0,
-        description: "UI components",
     };
 }

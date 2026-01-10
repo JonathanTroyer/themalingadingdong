@@ -67,57 +67,36 @@ fn hue_dependency_is_continuous() {
 }
 
 #[test]
-fn roundtrip_preserves_saturated_colors() {
-    let test_colors = [
-        Srgb::new(1.0f32, 0.0, 0.0), // Red
-        Srgb::new(0.0f32, 1.0, 0.0), // Green
-        Srgb::new(0.0f32, 0.0, 1.0), // Blue
-        Srgb::new(1.0f32, 1.0, 0.0), // Yellow
-        Srgb::new(1.0f32, 0.0, 1.0), // Magenta
-        Srgb::new(0.0f32, 1.0, 1.0), // Cyan
+fn roundtrip_preserves_colors() {
+    // Test cases: (color, epsilon) - saturated colors need looser epsilon at gamut boundary
+    let test_cases: [(Srgb<f32>, f32); 15] = [
+        // Saturated (gamut boundary - looser tolerance)
+        (Srgb::new(1.0, 0.0, 0.0), 0.02),
+        (Srgb::new(0.0, 1.0, 0.0), 0.02),
+        (Srgb::new(0.0, 0.0, 1.0), 0.02),
+        (Srgb::new(1.0, 1.0, 0.0), 0.02),
+        (Srgb::new(1.0, 0.0, 1.0), 0.02),
+        (Srgb::new(0.0, 1.0, 1.0), 0.02),
+        // Muted
+        (Srgb::new(0.3, 0.2, 0.4), 0.01),
+        (Srgb::new(0.7, 0.5, 0.3), 0.01),
+        (Srgb::new(0.2, 0.6, 0.5), 0.01),
+        (Srgb::new(0.8, 0.7, 0.9), 0.01),
+        // Grays
+        (Srgb::new(0.0, 0.0, 0.0), 0.01),
+        (Srgb::new(0.25, 0.25, 0.25), 0.01),
+        (Srgb::new(0.5, 0.5, 0.5), 0.01),
+        (Srgb::new(0.75, 0.75, 0.75), 0.01),
+        (Srgb::new(1.0, 1.0, 1.0), 0.01),
     ];
 
-    for original in test_colors.iter() {
-        let hellwig = HellwigJmh::from_srgb(*original);
-        let result = hellwig.into_srgb();
-
-        assert_relative_eq!(original.red, result.red, epsilon = 0.02);
-        assert_relative_eq!(original.green, result.green, epsilon = 0.02);
-        assert_relative_eq!(original.blue, result.blue, epsilon = 0.02);
-    }
-}
-
-#[test]
-fn roundtrip_preserves_muted_colors() {
-    let test_colors = [
-        Srgb::new(0.3f32, 0.2, 0.4),
-        Srgb::new(0.7f32, 0.5, 0.3),
-        Srgb::new(0.2f32, 0.6, 0.5),
-        Srgb::new(0.8f32, 0.7, 0.9),
-    ];
-
-    for original in test_colors.iter() {
-        let hellwig = HellwigJmh::from_srgb(*original);
-        let result = hellwig.into_srgb();
-
-        assert_relative_eq!(original.red, result.red, epsilon = 0.01);
-        assert_relative_eq!(original.green, result.green, epsilon = 0.01);
-        assert_relative_eq!(original.blue, result.blue, epsilon = 0.01);
-    }
-}
-
-#[test]
-fn roundtrip_preserves_grays() {
-    let grays = [0.0f32, 0.25, 0.5, 0.75, 1.0];
-
-    for gray in grays.iter() {
-        let original = Srgb::new(*gray, *gray, *gray);
+    for (original, epsilon) in test_cases {
         let hellwig = HellwigJmh::from_srgb(original);
         let result = hellwig.into_srgb();
 
-        assert_relative_eq!(original.red, result.red, epsilon = 0.01);
-        assert_relative_eq!(original.green, result.green, epsilon = 0.01);
-        assert_relative_eq!(original.blue, result.blue, epsilon = 0.01);
+        assert_relative_eq!(original.red, result.red, epsilon = epsilon);
+        assert_relative_eq!(original.green, result.green, epsilon = epsilon);
+        assert_relative_eq!(original.blue, result.blue, epsilon = epsilon);
     }
 }
 
@@ -188,15 +167,6 @@ fn u8_conversion_roundtrip() {
     assert!((original.red as i16 - result.red as i16).abs() <= 1);
     assert!((original.green as i16 - result.green as i16).abs() <= 1);
     assert!((original.blue as i16 - result.blue as i16).abs() <= 1);
-}
-
-#[test]
-fn new_constructor_works() {
-    let hellwig = HellwigJmh::new(50.0, 30.0, 180.0);
-
-    assert_relative_eq!(hellwig.lightness, 50.0);
-    assert_relative_eq!(hellwig.colorfulness, 30.0);
-    assert_relative_eq!(hellwig.hue, 180.0);
 }
 
 #[test]

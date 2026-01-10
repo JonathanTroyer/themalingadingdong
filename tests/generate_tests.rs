@@ -1,69 +1,7 @@
 use palette::Srgb;
-use themalingadingdong::config::parse_color;
 use themalingadingdong::curves::InterpolationConfig;
-use themalingadingdong::generate::{GenerateConfig, generate};
-use themalingadingdong::interpolation::{
-    DEFAULT_BASE16_HUES, build_hues_with_overrides, generate_accent_hues, interpolate_lightness,
-};
-
-#[test]
-fn test_interpolate_lightness_endpoints() {
-    let dark = Srgb::new(0.1f32, 0.1, 0.1);
-    let light = Srgb::new(0.9f32, 0.9, 0.9);
-
-    let colors = interpolate_lightness(dark, light, 8);
-
-    // First color should be similar to dark
-    assert!((colors[0].red - 0.1).abs() < 0.1);
-
-    // Last color should be similar to light
-    assert!((colors[7].red - 0.9).abs() < 0.1);
-}
-
-#[test]
-fn test_interpolate_lightness_monotonic() {
-    let dark = Srgb::new(0.1f32, 0.1, 0.12);
-    let light = Srgb::new(0.9f32, 0.9, 0.88);
-
-    let colors = interpolate_lightness(dark, light, 8);
-
-    // Luminance should be monotonically increasing
-    for i in 1..colors.len() {
-        let lum_prev =
-            0.2126 * colors[i - 1].red + 0.7152 * colors[i - 1].green + 0.0722 * colors[i - 1].blue;
-        let lum_curr = 0.2126 * colors[i].red + 0.7152 * colors[i].green + 0.0722 * colors[i].blue;
-        assert!(
-            lum_curr >= lum_prev - 0.01,
-            "Luminance should be non-decreasing: {} < {}",
-            lum_curr,
-            lum_prev
-        );
-    }
-}
-
-#[test]
-fn test_generate_accent_hues_correct_count() {
-    // HellwigJmh: lightness=70, colorfulness=15 (was OKLCH L=0.7, chroma=0.12)
-    let accents = generate_accent_hues(25.0, 70.0, 15.0, 8);
-    assert_eq!(accents.len(), 8);
-}
-
-#[test]
-fn test_generate_accent_hues_different_colors() {
-    // HellwigJmh: lightness=70, colorfulness=25 (was OKLCH L=0.7, chroma=0.15)
-    let accents = generate_accent_hues(0.0, 70.0, 25.0, 8);
-
-    // All colors should be different
-    for i in 0..accents.len() {
-        for j in (i + 1)..accents.len() {
-            let dist = ((accents[i].red - accents[j].red).powi(2)
-                + (accents[i].green - accents[j].green).powi(2)
-                + (accents[i].blue - accents[j].blue).powi(2))
-            .sqrt();
-            assert!(dist > 0.01, "Colors {} and {} should be different", i, j);
-        }
-    }
-}
+use themalingadingdong::generate::{GenerateConfig, generate, parse_color};
+use themalingadingdong::interpolation::{DEFAULT_BASE16_HUES, build_hues_with_overrides};
 
 #[test]
 fn test_parse_hex_with_hash() {
