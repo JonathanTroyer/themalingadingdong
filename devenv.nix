@@ -5,12 +5,13 @@
 
 {
   packages = with pkgs; [
-    nixfmt-rfc-style
+    nixfmt
     treefmt
     cargo-nextest
     cargo-tarpaulin
     cargo-insta
     cargo-dist
+    cargo-audit
   ];
 
   languages = {
