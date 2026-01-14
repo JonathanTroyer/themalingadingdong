@@ -10,6 +10,7 @@
     cargo-nextest
     cargo-tarpaulin
     cargo-insta
+    cargo-dist
   ];
 
   languages = {

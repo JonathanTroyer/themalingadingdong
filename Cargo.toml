@@ -56,3 +56,8 @@ csscolorparser = "0.8"
 [[bench]]
 name = "benchmarks"
 harness = false
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

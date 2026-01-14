@@ -1,0 +1,104 @@
+# Continuous Integration workflow
+# Runs tests, linting, and format checks on all PRs and pushes to main
+# Also callable from release workflow via workflow_call
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Format check (cargo check first to generate src/generated/)
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Generate code (build.rs)
+        run: cargo check --quiet
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  # Clippy linting
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # Main test suite with nextest
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run tests
+        run: cargo nextest run --profile ci --all-features
+        env:
+          INSTA_UPDATE: no
+      - name: Run doctests
+        run: cargo test --doc --all-features
+
+  # Verify insta snapshots are up-to-date
+  snapshots:
+    name: Snapshots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nextest and cargo-insta
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-insta
+      - name: Verify snapshots
+        run: cargo insta test --review --all-features
+        env:
+          INSTA_UPDATE: no
+          CI: true
+
+  # Build check (ensures it compiles on release mode)
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: true
+      - name: Build release
+        run: cargo build --release --all-features
+
+  # Security audit - runs cargo-audit directly
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+      - name: Run audit
+        run: cargo audit

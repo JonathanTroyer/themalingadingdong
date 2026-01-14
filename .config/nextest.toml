@@ -6,9 +6,34 @@
 retries = 0
 # Timeout for each test
 slow-timeout = { period = "60s", terminate-after = 2 }
+# Status level for test output
+status-level = "pass"
+# Final status level
+final-status-level = "flaky"
 
 [profile.ci]
-# More retries in CI to handle flaky tests
+# Retries for handling transient failures
 retries = 2
-# Fail fast in CI
+# Fail fast for quicker feedback in CI
 fail-fast = true
+# Stricter timeouts in CI
+slow-timeout = { period = "30s", terminate-after = 3 }
+# Show all test results in CI logs
+status-level = "all"
+final-status-level = "all"
+# Ensure proper failure reporting
+failure-output = "immediate-final"
+success-output = "never"
+
+[profile.ci.junit]
+# Generate JUnit XML for CI integration
+path = "target/nextest/ci/junit.xml"
+report-name = "themalingadingdong-tests"
+
+# Snapshot-focused profile for insta verification
+[profile.snapshots]
+retries = 0
+fail-fast = true
+slow-timeout = { period = "120s", terminate-after = 1 }
+status-level = "all"
+final-status-level = "all"

@@ -1,0 +1,65 @@
+# Example configuration for themalingadingdong
+# A dark theme with customized accent optimization
+
+[theme]
+name = "midnight-slate"
+author = "Example Author"
+variant = "dark"          # Hint for theme variant: "dark", "light", or "auto"
+
+[colors]
+# Background and foreground colors (any CSS format: hex, rgb, hsl, oklch, named)
+background = "#1a1b26"
+foreground = "#c0caf5"
+
+# Optional hue overrides for accent colors (degrees 0-360)
+# Default hues: Red=25, Orange=55, Yellow=90, Green=145, Cyan=180, Blue=250, Purple=285, Magenta=335
+[colors.hue_overrides]
+base08 = 355.0 # Red - shifted slightly toward magenta
+base09 = 45.0  # Orange - warmer
+# base0a          # Yellow - use default (90)
+base0b = 150.0 # Green - slightly cooler
+base0c = 190.0 # Cyan - shifted toward teal
+base0d = 230.0 # Blue - slightly purple-shifted
+base0e = 280.0 # Purple - true purple
+base0f = 340.0 # Magenta - pinkish
+
+[contrast]
+# APCA contrast settings (Lc values)
+minimum = 75.0          # Minimum contrast for base08-base0F accents
+extended_minimum = 60.0 # Minimum contrast for base10-base17 extended accents
+max_adjustment = 2.0    # Maximum per-hue lightness adjustment (J' units)
+
+[curves]
+# Interpolation curves for UI color generation (base00-base07)
+# Available types: linear, smoothstep, smootherstep, smooth_start, smooth_end, sigmoid, bspline
+
+[curves.lightness]
+type = "smoothstep" # S-curve for perceptually even lightness steps
+strength = 1.0      # Only used for sigmoid type
+
+[curves.chroma]
+type = "linear"
+strength = 1.0
+
+[curves.hue]
+type = "linear"
+strength = 1.0
+
+[optimization]
+# Optimization settings for main accent colors (base08-base0F)
+target_j = 80.0       # Target lightness (J') - higher = brighter accents
+target_m = 25.0       # Target colorfulness (M) - higher = more vivid
+delta_j = 3.0         # Max deviation from target_j
+delta_m = 6.0         # Max deviation from target_m
+j_weight = 0.75       # Balance J vs M uniformity (0=M priority, 1=J priority)
+contrast_weight = 0.8 # Balance contrast vs uniformity (0=uniformity, 1=contrast)
+
+[extended_optimization]
+# Optimization settings for extended accent colors (base10-base17)
+# Typically brighter with more colorfulness than main accents
+target_j = 70.0
+target_m = 35.0
+delta_j = 3.0
+delta_m = 6.0
+j_weight = 0.75
+contrast_weight = 0.8
