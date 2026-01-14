@@ -1,6 +1,6 @@
 [package]
 name = "themalingadingdong"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2024"
 description = "Base24 palette generator using Hellwig-Fairchild CAM16 with APCA validation"
 license = "MIT"
