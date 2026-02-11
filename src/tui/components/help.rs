@@ -28,8 +28,12 @@ const HELP_GROUPS: &[KeybindingGroup] = &[
         ],
     },
     KeybindingGroup {
-        title: "Views",
-        actions: &[AppAction::CodePreview],
+        title: "Actions",
+        actions: &[
+            AppAction::CodePreview,
+            AppAction::Export,
+            AppAction::ToggleDarkLight,
+        ],
     },
     KeybindingGroup {
         title: "Focus Navigation",
@@ -71,6 +75,8 @@ const EXTRA_BINDINGS: &[(&str, &str)] = &[
 pub const MAIN_FOOTER_ACTIONS: &[AppAction] = &[
     AppAction::Tui(TuiEvent::Selection(SelectionEvent::Next)),
     AppAction::CodePreview,
+    AppAction::Export,
+    AppAction::ToggleDarkLight,
     AppAction::Tui(TuiEvent::App(AppEvent::Help)),
     AppAction::Tui(TuiEvent::App(AppEvent::Quit)),
     AppAction::Tui(TuiEvent::App(AppEvent::Refresh)),

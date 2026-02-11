@@ -45,6 +45,8 @@ pub enum AppAction {
     Tui(TuiEvent),
     /// Switch to code preview screen
     CodePreview,
+    /// Export the current palette to a file
+    Export,
     /// Increment value by small step (1)
     ValueIncrementSmall,
     /// Decrement value by small step (1)
@@ -70,6 +72,7 @@ pub static DISPATCHER: LazyLock<TuiRealmDispatcher<AppAction>> = LazyLock::new(|
         keys::char('c'),
         "View code preview"
     );
+    bind_action!(config, AppAction::Export, keys::char('e'), "Export palette");
     bind_action!(
         config,
         AppAction::ValueDecrementSmall,
@@ -118,6 +121,7 @@ pub fn handle_global_app_events(action: &AppAction) -> Option<Msg> {
         AppAction::Tui(TuiEvent::App(AppEvent::Help)) => Some(Msg::ShowHelp),
         AppAction::Tui(TuiEvent::App(AppEvent::Refresh)) => Some(Msg::Regenerate),
         AppAction::CodePreview => Some(Msg::SwitchToCodePreview),
+        AppAction::Export => Some(Msg::DoExport),
         AppAction::ToggleDarkLight => Some(Msg::ToggleDarkLight),
         _ => None,
     }

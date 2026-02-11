@@ -475,37 +475,63 @@ impl Activity for MainActivity {
                 .constraints([Constraint::Min(10), Constraint::Length(13)])
                 .split(cols[0]);
 
-            // Right column: Parameters (fixed) + Validation (grows)
-            let right_rows = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(30), Constraint::Min(8)])
-                .split(cols[1]);
-
             // Render components
             app.view(&Id::Palette, frame, left_rows[0]);
             app.view(&Id::Preview, frame, left_rows[1]);
 
-            // Parameters section
+            // Parameters section layout - heights defined once, total computed automatically
+            const PARAM_HEIGHTS: &[u16] = &[
+                4, // 0: Background picker (header + J/M/h)
+                4, // 1: Foreground picker (header + J/M/h)
+                1, // 2: Spacer
+                3, // 3: Curve controls (3 rows, inline strength)
+                2, // 4: Weight controls (grouped)
+                1, // 5: Spacer
+                5, // 6: Accent controls (grouped)
+                5, // 7: Extended accent controls (grouped)
+                1, // 8: Spacer
+                3, // 9: Hue overrides
+            ];
+            const PARAMS_CONTENT_HEIGHT: u16 = const {
+                let mut sum = 0u16;
+                let mut i = 0;
+                while i < PARAM_HEIGHTS.len() {
+                    sum += PARAM_HEIGHTS[i];
+                    i += 1;
+                }
+                sum
+            };
+
+            // Right column: Parameters (content + borders) + Validation (fills remaining)
+            let right_rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(PARAMS_CONTENT_HEIGHT + 2),
+                    Constraint::Fill(1),
+                ])
+                .split(cols[1]);
+
             let params_area = right_rows[0];
             let params_block = Block::default().title(" Parameters ").borders(Borders::ALL);
             let params_inner = params_block.inner(params_area);
             frame.render_widget(params_block, params_area);
 
+            let param_constraints: [Constraint; 11] = [
+                Constraint::Length(PARAM_HEIGHTS[0]),
+                Constraint::Length(PARAM_HEIGHTS[1]),
+                Constraint::Length(PARAM_HEIGHTS[2]),
+                Constraint::Length(PARAM_HEIGHTS[3]),
+                Constraint::Length(PARAM_HEIGHTS[4]),
+                Constraint::Length(PARAM_HEIGHTS[5]),
+                Constraint::Length(PARAM_HEIGHTS[6]),
+                Constraint::Length(PARAM_HEIGHTS[7]),
+                Constraint::Length(PARAM_HEIGHTS[8]),
+                Constraint::Length(PARAM_HEIGHTS[9]),
+                Constraint::Min(0),
+            ];
             let param_rows = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(4), // 0: Background picker (header + J/M/h)
-                    Constraint::Length(4), // 1: Foreground picker (header + J/M/h)
-                    Constraint::Length(1), // 2: Spacer
-                    Constraint::Length(3), // 3: Curve controls (3 rows, inline strength)
-                    Constraint::Length(2), // 4: Weight controls (grouped)
-                    Constraint::Length(1), // 5: Spacer
-                    Constraint::Length(5), // 6: Accent controls (grouped)
-                    Constraint::Length(5), // 7: Extended accent controls (grouped)
-                    Constraint::Length(1), // 8: Spacer
-                    Constraint::Length(3), // 9: Hue overrides
-                    Constraint::Min(0),
-                ])
+                .constraints(param_constraints)
                 .split(params_inner);
 
             app.view(&Id::BackgroundPicker, frame, param_rows[0]);

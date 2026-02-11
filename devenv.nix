@@ -38,7 +38,6 @@
     config = {
       programs.nixfmt = {
         enable = true;
-        package = pkgs.nixfmt-rfc-style;
       };
       programs.rustfmt = {
         enable = true;
@@ -51,7 +50,11 @@
 
   git-hooks.hooks = {
     treefmt.enable = true;
-    clippy.enable = true;
+    clippy = {
+      enable = true;
+      # Default wraps nixpkgs clippy (different rustc than rust-overlay toolchain)
+      entry = "cargo clippy --";
+    };
     commitizen.enable = true;
     nextest = {
       enable = true;
